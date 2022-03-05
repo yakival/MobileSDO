@@ -238,7 +238,7 @@ class _TQuestionPreview extends State<TQuestionPreview> {
             )
           : Container(),
       Container(
-        padding: EdgeInsets.all(10.00),
+        padding: const EdgeInsets.all(10.00),
       ),
     ]);
   }

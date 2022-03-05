@@ -82,27 +82,30 @@ class _ZakazPageState extends State<ZakazPage> {
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 20.0, vertical: 10.0),
                       title: Text(element['CourseName']),
-                      subtitle: Row(
-                        children: [
-                          const Icon(
-                            Icons.timer,
-                            color: Colors.blue,
-                          ),
-                          Text(element["CourseDuration"].toString()),
-                          const SizedBox(
-                            width: 30,
-                          ),
-                          const Icon(
-                            Icons.credit_card,
-                            color: Colors.blue,
-                          ),
-                          Text(element["CoursePrice"].toString()),
-                          const SizedBox(
-                            width: 10,
-                          ),
-                          Text(element["CourseCurrency"].toString()),
-                        ],
-                      ),
+                      subtitle: Padding(
+                          padding:
+                              const EdgeInsets.fromLTRB(0.0, 10.0, 0.0, 0.0),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.timer,
+                                color: Colors.blue,
+                              ),
+                              Text(element["CourseDuration"].toString()),
+                              const SizedBox(
+                                width: 30,
+                              ),
+                              const Icon(
+                                Icons.credit_card,
+                                color: Colors.blue,
+                              ),
+                              Text(element["CoursePrice"].toString()),
+                              const SizedBox(
+                                width: 10,
+                              ),
+                              Text(element["CourseCurrency"].toString()),
+                            ],
+                          )),
                       trailing: const Icon(Icons.arrow_forward),
                       onTap: () {
                         setState(() {
@@ -236,8 +239,8 @@ class _ZakazPageState extends State<ZakazPage> {
                                       } else {
                                         ScaffoldMessenger.of(context)
                                             .showSnackBar(const SnackBar(
-                                          content:
-                                              Text('Ошибка оформления заявки'),
+                                          content: Text(
+                                              'Данный заказ был отправлен ранее'),
                                           backgroundColor: Colors.red,
                                         ));
                                       }

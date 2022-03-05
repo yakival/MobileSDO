@@ -183,30 +183,41 @@ class _ItemPageState extends State<ItemPage> {
                       //    ? Text(GlobalData.getDateString(item.dtend!))
                       //    : null,
                       leading: (item.type == 'pdf')
-                          ? const Icon(
-                              Icons.picture_as_pdf_outlined,
-                              color: Colors.blue,
-                            )
+                          ? const Padding(
+                              padding: EdgeInsets.fromLTRB(10.0, 0.0, 0.0, 0.0),
+                              child: Icon(
+                                Icons.picture_as_pdf_outlined,
+                                color: Colors.blue,
+                              ))
                           : (item.type == 'png' ||
                                   item.type == 'jpg' ||
                                   item.type == 'gif')
-                              ? const Icon(
-                                  Icons.image,
-                                  color: Colors.blue,
-                                )
+                              ? const Padding(
+                                  padding:
+                                      EdgeInsets.fromLTRB(10.0, 0.0, 0.0, 0.0),
+                                  child: Icon(
+                                    Icons.image,
+                                    color: Colors.blue,
+                                  ))
                               : (item.type == 'mp4')
-                                  ? const Icon(
-                                      Icons.video_camera_back_outlined,
-                                      color: Colors.blue,
-                                    )
+                                  ? const Padding(
+                                      padding: EdgeInsets.fromLTRB(
+                                          10.0, 0.0, 0.0, 0.0),
+                                      child: Icon(
+                                        Icons.video_camera_back_outlined,
+                                        color: Colors.blue,
+                                      ))
                                   : (item.type == 'doc' ||
                                           item.type == 'docx' ||
                                           item.type == 'xls' ||
                                           item.type == 'xlsx')
-                                      ? const Icon(
-                                          Icons.document_scanner,
-                                          color: Colors.blue,
-                                        )
+                                      ? const Padding(
+                                          padding: EdgeInsets.fromLTRB(
+                                              10.0, 0.0, 0.0, 0.0),
+                                          child: Icon(
+                                            Icons.document_scanner,
+                                            color: Colors.blue,
+                                          ))
                                       : ((item.type == 'SCORM') && item.load!)
                                           ? IconButton(
                                               onPressed: () async {

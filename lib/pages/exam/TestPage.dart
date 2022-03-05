@@ -25,9 +25,12 @@ class _TestPageState extends State<TestPage> {
   Directory? testDirectory;
   TQuestion? _currQuestion;
   List<TQuestion> list_ = [];
+  late ScrollController _scrollController;
 
   @override
   void initState() {
+    _scrollController = ScrollController();
+
     super.initState();
 
     _startServer();
@@ -36,6 +39,7 @@ class _TestPageState extends State<TestPage> {
   @override
   void dispose() {
     _cleanup();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -63,6 +67,11 @@ class _TestPageState extends State<TestPage> {
     return (null);
   }
 
+  void _scrollToTop() {
+    _scrollController.animateTo(0,
+        duration: const Duration(milliseconds: 50), curve: Curves.linear);
+  }
+
   @override
   Widget build(BuildContext context) {
     final args = ModalRoute.of(context)!.settings.arguments as List;
@@ -82,6 +91,7 @@ class _TestPageState extends State<TestPage> {
                 ElevatedButton(
                   onPressed: () {
                     setState(() {
+                      _scrollToTop();
                       _currQuestion = getQuestion(_currQuestion);
                       (_currQuestion == null)
                           ? _stackToView = 2
@@ -112,6 +122,7 @@ class _TestPageState extends State<TestPage> {
                           primary: Colors.white, onPrimary: Colors.black),
                       onPressed: () {
                         setState(() {
+                          _scrollToTop();
                           _currQuestion = getQuestion(_currQuestion);
                           (_currQuestion == null)
                               ? _stackToView = 2
@@ -143,6 +154,7 @@ class _TestPageState extends State<TestPage> {
                                   onPrimary: Colors.black),
                               onPressed: () {
                                 setState(() {
+                                  _scrollToTop();
                                   _currQuestion = getQuestion(_currQuestion);
                                   (_currQuestion == null)
                                       ? _stackToView = 2
@@ -158,6 +170,7 @@ class _TestPageState extends State<TestPage> {
                             ElevatedButton(
                               onPressed: () {
                                 setState(() {
+                                  _scrollToTop();
                                   _currQuestion?.IsMarked = true;
                                   _currQuestion = getQuestion(_currQuestion);
                                   (_currQuestion == null)
@@ -177,6 +190,7 @@ class _TestPageState extends State<TestPage> {
                                   onPrimary: Colors.black),
                               onPressed: () {
                                 setState(() {
+                                  _scrollToTop();
                                   _currQuestion = null;
                                   _stackToView = 2;
                                 });
@@ -188,71 +202,72 @@ class _TestPageState extends State<TestPage> {
         body: Padding(
             padding: const EdgeInsets.all(16.0),
             child: SingleChildScrollView(
+                controller: _scrollController,
                 child: IndexedStack(
-              index: _stackToView,
-              children: [
-                // 0 - экран ожидания
-                const Center(
-                  child: CircularProgressIndicator(),
-                ),
-                // 1 - экран теста
-                Center(
-                    child: Column(
-                  children: <Widget>[
-                    TestPreview(
+                  index: _stackToView,
+                  children: [
+                    // 0 - экран ожидания
+                    const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                    // 1 - экран теста
+                    Center(
+                        child: Column(
+                      children: <Widget>[
+                        TestPreview(
+                          test: _args,
+                          onSelect: (value) {
+                            if (value == 0) {
+                              Navigator.of(context).pop();
+                            } else {
+                              setState(() {
+                                _stackToView = 2;
+                              });
+                            }
+                          },
+                        ),
+                      ],
+                    )),
+                    // 2 - список вопросов
+                    Center(
+                        child: QuestionList(
                       test: _args,
+                      dir: testDirectory!.path.toString(),
                       onSelect: (value) {
-                        if (value == 0) {
+                        if (value == null) {
                           Navigator.of(context).pop();
                         } else {
                           setState(() {
-                            _stackToView = 2;
+                            _currQuestion = value;
+                            _stackToView = 3;
                           });
                         }
                       },
-                    ),
+                    )),
+                    // 3 - оформление вопроса
+                    Center(
+                        child: (_currQuestion != null)
+                            ? TQuestionPreview(
+                                test: _args,
+                                question: _currQuestion!,
+                                dir: testDirectory!.path.toString(),
+                                onSelect: (value) {
+                                  if (value == null) {
+                                    setState(() {
+                                      _currQuestion = null;
+                                      _stackToView = 2;
+                                    });
+                                  } else {
+                                    setState(() {
+                                      _currQuestion = value;
+                                      _stackToView = 3;
+                                    });
+                                  }
+                                },
+                              )
+                            : null),
                   ],
-                )),
-                // 2 - список вопросов
-                Center(
-                    child: QuestionList(
-                  test: _args,
-                  dir: testDirectory!.path.toString(),
-                  onSelect: (value) {
-                    if (value == null) {
-                      Navigator.of(context).pop();
-                    } else {
-                      setState(() {
-                        _currQuestion = value;
-                        _stackToView = 3;
-                      });
-                    }
-                  },
-                )),
-                // 3 - оформление вопроса
-                Center(
-                    child: (_currQuestion != null)
-                        ? TQuestionPreview(
-                            test: _args,
-                            question: _currQuestion!,
-                            dir: testDirectory!.path.toString(),
-                            onSelect: (value) {
-                              if (value == null) {
-                                setState(() {
-                                  _currQuestion = null;
-                                  _stackToView = 2;
-                                });
-                              } else {
-                                setState(() {
-                                  _currQuestion = value;
-                                  _stackToView = 3;
-                                });
-                              }
-                            },
-                          )
-                        : null),
-              ],
-            ))));
+                ))));
   }
 
   Future _startServer() async {
