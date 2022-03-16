@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
+import 'package:disk_space/disk_space.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http_server/http_server.dart';
@@ -23,11 +24,12 @@ class _WebViewPageState extends State<WebViewPage> {
   Item _args = Item();
   Directory _httpDirectory = Directory("");
   int _stackToView = 1;
+  bool _unzipped = true;
 
   @override
   void initState() {
     super.initState();
-
+    if (Platform.isAndroid) WebView.platform = AndroidWebView();
     _startServer();
     // Enable hybrid composition.
     //if (Platform.isAndroid) WebView.platform = SurfaceAndroidWebView();
@@ -46,7 +48,24 @@ class _WebViewPageState extends State<WebViewPage> {
       _args = args;
     });
 
-    if (_initialUrl == "") return const CircularProgressIndicator();
+    if (!_unzipped) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text("Нет свободного места"),
+        backgroundColor: Colors.red,
+      ));
+    }
+
+    if (_initialUrl == "") {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(args.name!),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
     return Scaffold(
         appBar: AppBar(
@@ -63,6 +82,7 @@ class _WebViewPageState extends State<WebViewPage> {
                   javascriptMode: JavascriptMode.unrestricted,
                   debuggingEnabled: true,
                   allowsInlineMediaPlayback: true,
+                  zoomEnabled: true,
                   onPageStarted: (url) {
                     //await controller.evaluateJavascript(source: "window.localStorage.setItem('key', 'localStorage value!')");
                   },
@@ -100,7 +120,7 @@ class _WebViewPageState extends State<WebViewPage> {
     final VirtualDirectory staticFiles = VirtualDirectory(httpDirectory.path)
       ..allowDirectoryListing = true;
 
-    await _setupHttpFolder(httpDirectory);
+    _unzipped = await _setupHttpFolder(httpDirectory);
     await runZoned(() async {
       final HttpServer server =
           await HttpServer.bind(InternetAddress.loopbackIPv4, 3000);
@@ -117,7 +137,7 @@ class _WebViewPageState extends State<WebViewPage> {
   }
 
   /// preparing http assets
-  Future _setupHttpFolder(Directory parentDir) async {
+  Future<bool> _setupHttpFolder(Directory parentDir) async {
     Archive archive;
 
     String indexContent = await rootBundle.loadString('assets/index.txt');
@@ -144,7 +164,19 @@ class _WebViewPageState extends State<WebViewPage> {
       content[i] = data.getUint8(i);
     }
     archive = ZipDecoder().decodeBytes(content);
+    var _size = 0;
+    for (ArchiveFile file in archive) {
+      if (file.isFile) {
+        _size += file.size;
+      }
+    }
+    var _free = await DiskSpace.getFreeDiskSpace;
+    _free = (_free ?? 0) * (1024.0 * 1024.0);
+    if (_size > _free) {
+      return false;
+    }
     _uncompress(archive, archiveDir);
+    return true;
   }
 
   /// uncompressing the example archive to app directory

@@ -21,28 +21,44 @@ class DBProvider {
 
   initDB() async {
     Directory documentsDirectory = await getApplicationDocumentsDirectory();
+    final checkPath =
+        await Directory('${documentsDirectory.path}/storage').exists();
+    if (!checkPath) {
+      Directory('${documentsDirectory.path}/storage')
+          .createSync(recursive: true);
+    }
     String path = join(documentsDirectory.path, dname);
-    return await openDatabase(path, version: 22, onOpen: (db) {},
+    return await openDatabase(path, version: 24, onOpen: (db) {},
         onCreate: (Database db, int version) async {
       var batch = db.batch();
-      _createTableConfig(batch);
-      _createTableCourse(batch);
-      _createTableItems(batch);
-      _createTableWebinars(batch);
+      await _createTableConfig(batch);
+      await _createTableCourse(batch);
+      await _createTableItems(batch);
+      await _createTableWebinars(batch);
       await batch.commit();
     }, onUpgrade: (Database db, int oldVersion, int newVersion) async {
       var batch = db.batch();
-      if (oldVersion < 22) {
-        _createTableCourse(batch);
-        _createTableItems(batch);
-        _createTableWebinars(batch);
+      if (oldVersion < 24) {
+        await _createTableCourse(batch);
+        await _createTableItems(batch);
+        await _createTableWebinars(batch);
+
+        await deleteDir('${documentsDirectory.path}/storage');
       }
       await batch.commit();
     });
   }
 
+  Future<void> deleteDir(dir) async {
+    final directory = Directory(dir);
+    var _folders = directory.listSync(recursive: true, followLinks: false);
+    for (FileSystemEntity fl in _folders) {
+      fl.deleteSync();
+    }
+  }
+
   /// Create Config
-  void _createTableConfig(Batch batch) {
+  Future<void> _createTableConfig(Batch batch) async {
     batch.execute('DROP TABLE IF EXISTS Config');
     batch.execute('''CREATE TABLE Config (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,7 +69,7 @@ class DBProvider {
   }
 
   /// Create Course
-  void _createTableCourse(Batch batch) {
+  Future<void> _createTableCourse(Batch batch) async {
     batch.execute('DROP TABLE IF EXISTS Course');
     batch.execute('''CREATE TABLE Course (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,7 +83,7 @@ class DBProvider {
   }
 
   /// Create Items
-  void _createTableItems(Batch batch) {
+  Future<void> _createTableItems(Batch batch) async {
     batch.execute('DROP TABLE IF EXISTS Items');
     batch.execute('''CREATE TABLE Items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -82,7 +98,8 @@ class DBProvider {
       exec TINYINT(1),
       dtexec DATETIME,
       sync TINYINT(1),
-      load TINYINT(1)
+      load TINYINT(1),
+      menu TINYINT(1)
     )''');
     batch.execute('''CREATE INDEX "items_course_index" ON "items" (
 	    "courseid"
@@ -90,7 +107,7 @@ class DBProvider {
   }
 
   /// Create Webinars
-  void _createTableWebinars(Batch batch) {
+  Future<void> _createTableWebinars(Batch batch) async {
     batch.execute('DROP TABLE IF EXISTS Webinars');
     batch.execute('''CREATE TABLE Webinars (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

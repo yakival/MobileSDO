@@ -24,7 +24,6 @@ void main() async {
     const Duration(seconds: 20),
     0,
     checkNotify,
-    //exact: true,
   );
 
   runApp(const MyApp());

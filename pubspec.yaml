@@ -44,7 +44,7 @@ dependencies:
   video_player:
   photo_view:
   http_server:
-  webview_flutter:
+  webview_flutter: ^3.0.1
   open_file: 
   #xml2json:
   connectivity_plus:
@@ -54,6 +54,7 @@ dependencies:
   url_launcher:
   flutter_html:
   grouped_list:
+  disk_space:
 
 dev_dependencies:
   flutter_test:

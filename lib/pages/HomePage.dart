@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:disk_space/disk_space.dart';
 import 'package:flutter/material.dart';
 import 'package:myapp/database/Database.dart';
 import 'package:myapp/database/ItemModel.dart';
@@ -31,7 +32,7 @@ class _HomePageState extends State<HomePage> {
   List<Item> _list = [];
   List<Item> __list = [];
   int _totalItems = 1, _receivedItems = 0;
-  int _total = 1, _received = 0;
+  int _total = 1, _received = 0, _index = -1;
 
   @override
   void initState() {
@@ -58,7 +59,8 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _downloadCourse(Course itm, context) async {
+  Future<void> _downloadCourse(Course itm, index, context) async {
+    _index = index;
     var isOnline = await hasNetwork(context);
     if (!isOnline) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -114,7 +116,32 @@ class _HomePageState extends State<HomePage> {
 
     final StreamedResponse _response =
         await http.Client().send(http.Request('GET', Uri.parse('$_url$_file')));
+    if (_response.statusCode != 200) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_response.reasonPhrase!),
+        backgroundColor: Colors.red,
+      ));
+      setState(() {
+        _total = 1;
+        _received = 0;
+      });
+      return;
+    }
+
     _total = _response.contentLength ?? 0;
+    var _free = await DiskSpace.getFreeDiskSpace;
+    _free = (_free ?? 0) * (1024.0 * 1024.0);
+    if (_total > _free) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text("Нет свободного места"),
+        backgroundColor: Colors.red,
+      ));
+      setState(() {
+        _total = 1;
+        _received = 0;
+      });
+      return;
+    }
 
     responseStream = _response.stream.listen((value) async {
       setState(() {
@@ -232,13 +259,23 @@ class _HomePageState extends State<HomePage> {
                                   width: 100,
                                   child: Column(children: <Widget>[
                                     LinearProgressIndicator(
-                                      value: _receivedItems / _totalItems,
+                                      backgroundColor: (_index == index)
+                                          ? null
+                                          : Colors.white,
+                                      value: (_index == index)
+                                          ? _receivedItems / _totalItems
+                                          : 0,
                                     ),
                                     const SizedBox(
                                       height: 5,
                                     ),
                                     LinearProgressIndicator(
-                                      value: _received / _total,
+                                      backgroundColor: (_index == index)
+                                          ? null
+                                          : Colors.white,
+                                      value: (_index == index)
+                                          ? _received / _total
+                                          : 0,
                                     ),
                                   ]),
                                 )
@@ -256,7 +293,8 @@ class _HomePageState extends State<HomePage> {
                                         color: Colors.green,
                                       ),
                                       onPressed: () async {
-                                        await _downloadCourse(item, context);
+                                        await _downloadCourse(
+                                            item, index, context);
                                       },
                                     ),
                           (!isLoad)

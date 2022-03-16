@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:disk_space/disk_space.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:http/http.dart';
 import 'package:myapp/pages/exam/class/Test.dart';
@@ -14,6 +16,7 @@ import 'package:myapp/database/ItemModel.dart';
 import 'package:myapp/database/CourseModel.dart';
 import 'package:open_file/open_file.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 
 class ItemPage extends StatefulWidget {
   const ItemPage({
@@ -63,7 +66,32 @@ class _ItemPageState extends State<ItemPage> {
     _index = index;
     final StreamedResponse _response =
         await http.Client().send(http.Request('GET', Uri.parse('$_url$_file')));
+    if (_response.statusCode != 200) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_response.reasonPhrase!),
+        backgroundColor: Colors.red,
+      ));
+      setState(() {
+        _total = 1;
+        _received = 0;
+      });
+      return;
+    }
+
     _total = _response.contentLength ?? 0;
+    var _free = await DiskSpace.getFreeDiskSpace;
+    _free = (_free ?? 0) * (1024.0 * 1024.0);
+    if (_total > _free) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text("Нет свободного места"),
+        backgroundColor: Colors.red,
+      ));
+      setState(() {
+        _total = 1;
+        _received = 0;
+      });
+      return;
+    }
 
     responseStream = _response.stream.listen((value) {
       setState(() {
@@ -105,7 +133,11 @@ class _ItemPageState extends State<ItemPage> {
         }
         */
 
-        itm.jsondata = '{"version": "V1p3", "toc": ' + jsonEncode(res) + '}';
+        itm.jsondata = '{"version": "V1p3", "menu": ' +
+            ((itm.menu ?? false) ? "true" : "false") +
+            ', "toc": ' +
+            jsonEncode(res) +
+            '}';
       }
       if (itm.type == "test") {
         var res = await httpAPI("close/students/mobileApp.asp",
@@ -139,6 +171,14 @@ class _ItemPageState extends State<ItemPage> {
     while (!_load) {
       await Future.delayed(const Duration(microseconds: 500));
     }
+  }
+
+  Future<double?> get getFreeDiskSpace async {
+    const MethodChannel _channel = MethodChannel('disk_space');
+
+    final double? freeDiskSpace =
+        await _channel.invokeMethod('getFreeDiskSpace');
+    return freeDiskSpace;
   }
 
   @override

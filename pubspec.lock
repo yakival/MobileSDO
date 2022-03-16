@@ -176,6 +176,13 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "2.1.1"
+  disk_space:
+    dependency: "direct main"
+    description:
+      name: disk_space
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "0.2.1"
   drag_and_drop_gridview:
     dependency: "direct main"
     description:
@@ -664,7 +671,7 @@ packages:
       name: webview_flutter
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "3.0.0"
+    version: "3.0.1"
   webview_flutter_android:
     dependency: transitive
     description:

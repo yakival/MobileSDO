@@ -30,6 +30,7 @@ class Item {
   bool? sync = false;
   bool? checked = false;
   bool? load = false;
+  bool? menu = false;
 
   Item(
       {this.id,
@@ -46,6 +47,7 @@ class Item {
       this.exec,
       this.sync,
       this.load,
+      this.menu,
       this.checked});
 
   factory Item.fromMap(Map<String, dynamic> json) => Item(
@@ -62,6 +64,7 @@ class Item {
         exec: json["exec"] == 1,
         sync: json["sync"] == 1,
         load: json["load"] == 1,
+        menu: json["menu"] == 1,
       );
 
   Map<String, dynamic> toMap() => {
@@ -78,6 +81,7 @@ class Item {
         "exec": exec,
         "sync": sync,
         "load": load,
+        "menu": menu,
       };
 }
 
@@ -89,8 +93,8 @@ newItem(Item newClient) async {
   id ??= 1;
   //insert to the table using the new id
   var raw = await db.rawInsert(
-      "INSERT Into Items (id,courseid,guid,name,description,type,path,localpath,jsondata,load,sync)"
-      " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+      "INSERT Into Items (id,courseid,guid,name,description,type,path,localpath,jsondata,load,sync,menu)"
+      " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
       [
         id,
         newClient.courseid,
@@ -103,6 +107,7 @@ newItem(Item newClient) async {
         newClient.jsondata,
         newClient.load,
         newClient.sync,
+        newClient.menu,
       ]);
   return raw;
 }

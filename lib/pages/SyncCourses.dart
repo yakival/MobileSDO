@@ -151,6 +151,7 @@ class _SyncCoursesState extends State<SyncCourses> {
 
   void runMigrate(context) async {
     isrun = true;
+    final appDir = await getApplicationDocumentsDirectory();
 
     if (_list.isNotEmpty) {
       for (var itm in _list) {
@@ -173,8 +174,7 @@ class _SyncCoursesState extends State<SyncCourses> {
             }
             var fn = itm["path"]!.split('/').last;
             var ext = itm["path"]!.split('.').last;
-            itm["localpath"] =
-                '${(await getApplicationDocumentsDirectory()).path}/$fn';
+            itm["localpath"] = '${appDir.path}/storage/$fn';
             if ((itm["type"] != "SCORM") && (itm["type"] != "test")) {
               itm["type"] = ext;
             }
@@ -186,9 +186,10 @@ class _SyncCoursesState extends State<SyncCourses> {
           setState(() {});
         } else {
           if (key) {
-            if (itm["type"] == "test") {
+            if (itm["type"] == "test" || itm["type"] == "SCORM") {
               Item itm_ = await getItemGuid(itm["guid"]);
               itm_.description = itm["description"];
+              itm_.menu = itm["menu"];
               await updateItem(itm_);
             }
           }
