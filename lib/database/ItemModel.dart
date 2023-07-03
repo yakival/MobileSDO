@@ -18,13 +18,19 @@ class Item {
   int? id;
   int? courseid;
   String? guid;
+  String? modulename;
   String? name;
   String? description;
   String? type;
   String? path;
   String? localpath;
   String? jsondata;
-  int? attempt;
+  String? links;
+  String? access;
+  String? history;
+  int? rate;
+  int? time;
+  String? attempt;
   DateTime? dtexec;
   bool? exec = false;
   bool? sync = false;
@@ -36,12 +42,18 @@ class Item {
       {this.id,
       this.courseid,
       this.guid,
+      this.modulename,
       this.name,
       this.description,
       this.type,
       this.path,
       this.localpath,
       this.jsondata,
+      this.access,
+      this.history,
+      this.links,
+      this.rate,
+      this.time,
       this.attempt,
       this.dtexec,
       this.exec,
@@ -54,13 +66,22 @@ class Item {
         id: json["id"],
         courseid: json["courseid"],
         guid: json["guid"],
+        modulename: json["modulename"],
         name: json["name"],
         description: json["description"],
         type: json["type"],
         path: json["path"],
         localpath: json["localpath"],
         jsondata: json["jsondata"],
-        dtexec: json["dtexec"],
+        access: json["access"],
+        history: json["history"],
+        links: json["links"],
+        rate: json["rate"],
+        time: json["time"],
+        attempt: json["attempt"],
+        dtexec: (json["dtexec"] == null)
+            ? null
+            : DateTime.parse(json["dtexec"].toString()),
         exec: json["exec"] == 1,
         sync: json["sync"] == 1,
         load: json["load"] == 1,
@@ -71,13 +92,20 @@ class Item {
         "id": id,
         "courseid": courseid,
         "guid": guid,
+        "modulename": modulename,
         "name": name,
         "description": description,
         "type": type,
         "path": path,
         "localpath": localpath,
         "jsondata": jsondata,
-        "dtexec": dtexec,
+        "access": access,
+        "history": history,
+        "links": links,
+        "rate": rate,
+        "time": time,
+        "attempt": attempt,
+        "dtexec": dtexec?.toIso8601String(),
         "exec": exec,
         "sync": sync,
         "load": load,
@@ -93,18 +121,25 @@ newItem(Item newClient) async {
   id ??= 1;
   //insert to the table using the new id
   var raw = await db.rawInsert(
-      "INSERT Into Items (id,courseid,guid,name,description,type,path,localpath,jsondata,load,sync,menu)"
-      " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+      "INSERT Into Items (id,courseid,guid,modulename,name,description,type,path,localpath,jsondata,access,history,links,rate,time,attempt,load,sync,menu)"
+      " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
       [
         id,
         newClient.courseid,
         newClient.guid,
+        newClient.modulename,
         newClient.name,
         newClient.description,
         newClient.type,
         newClient.path,
         newClient.localpath,
         newClient.jsondata,
+        newClient.access,
+        newClient.history,
+        newClient.links,
+        newClient.rate,
+        newClient.time,
+        newClient.attempt,
         newClient.load,
         newClient.sync,
         newClient.menu,
@@ -133,7 +168,7 @@ getItemGuid(String guid) async {
 
 Future<List<Item>> getAllItem() async {
   Database db = await DBProvider.db.database as Database;
-  var res = await db.query("Items");
+  var res = await db.query("Items", orderBy: "id desc");
   List<Item> list =
       res.isNotEmpty ? res.map((c) => Item.fromMap(c)).toList() : [];
   return list;
@@ -141,7 +176,7 @@ Future<List<Item>> getAllItem() async {
 
 Future<List<Item>> getCourseItem(id) async {
   Database db = await DBProvider.db.database as Database;
-  var res = await db.query("Items", where: "courseid = ?", whereArgs: [id]);
+  var res = await db.query("Items", where: "courseid = ?", whereArgs: [id], orderBy: "id desc");
   List<Item> list =
       res.isNotEmpty ? res.map((c) => Item.fromMap(c)).toList() : [];
   return list;
@@ -149,7 +184,7 @@ Future<List<Item>> getCourseItem(id) async {
 
 Future<List<Item>> getFreeItem() async {
   Database db = await DBProvider.db.database as Database;
-  var res = await db.query("Items", where: "courseid = ?", whereArgs: [0]);
+  var res = await db.query("Items", where: "courseid = ?", whereArgs: [0], orderBy: "id desc");
   List<Item> list =
       res.isNotEmpty ? res.map((c) => Item.fromMap(c)).toList() : [];
   return list;
@@ -157,7 +192,7 @@ Future<List<Item>> getFreeItem() async {
 
 deleteItem(Item item) async {
   if (File(item.path!).existsSync()) {
-    File(item.path!).delete();
+    File(item.path!).deleteSync(recursive: true);
   }
   Database db = await DBProvider.db.database as Database;
   return db.delete("Items", where: "id = ?", whereArgs: [item.id]);

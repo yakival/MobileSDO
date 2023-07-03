@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter/webview_flutter.dart' as web;
 import 'package:myapp/database/ItemModel.dart';
 
 class FileReaderPage extends StatefulWidget {
@@ -28,7 +28,7 @@ class _FileReaderPageState extends State<FileReaderPage> {
         appBar: AppBar(
           title: const Text("doc"),
         ),
-        body: WebView(
+        body: web.WebView(
           initialUrl:
               "https://docs.google.com/gview?embedded=true&url=file:///android_asset/flutter_assets/assets/example.xlsx",
         ));

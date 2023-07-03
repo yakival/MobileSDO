@@ -41,8 +41,12 @@ class Webinar {
         author: json["author"],
         type: json["type"],
         url: json["url"],
-        dtfrom: DateTime.parse(json["dtfrom"].toString()),
-        dtto: DateTime.parse(json["dtto"].toString()),
+        dtfrom: (json["dtfrom"] == null)
+            ? null
+            : DateTime.parse(json["dtfrom"].toString()),
+        dtto: (json["dtto"] == null)
+            ? null
+            : DateTime.parse(json["dtto"].toString()),
       );
 
   Map<String, dynamic> toMap() => {
@@ -52,8 +56,8 @@ class Webinar {
         "author": author,
         "type": type,
         "url": url,
-        "dtfrom": dtfrom,
-        "dtto": dtto,
+        "dtfrom": dtfrom?.toIso8601String(),
+        "dtto": dtto?.toIso8601String(),
       };
 }
 

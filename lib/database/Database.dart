@@ -14,7 +14,7 @@ class DBProvider {
   static Database? _database;
 
   Future<Database?> get database async {
-    if (_database != null) return _database;
+    //if (_database != null) return _database;
     _database = await initDB();
     return _database;
   }
@@ -28,22 +28,32 @@ class DBProvider {
           .createSync(recursive: true);
     }
     String path = join(documentsDirectory.path, dname);
-    return await openDatabase(path, version: 24, onOpen: (db) {},
+    const ver = 87;
+    return await openDatabase(path, version: ver, onOpen: (db) {},
         onCreate: (Database db, int version) async {
       var batch = db.batch();
       await _createTableConfig(batch);
       await _createTableCourse(batch);
+      await _createTableCourseCompl(batch);
       await _createTableItems(batch);
       await _createTableWebinars(batch);
+      await _createTableNotify(batch);
       await batch.commit();
     }, onUpgrade: (Database db, int oldVersion, int newVersion) async {
       var batch = db.batch();
-      if (oldVersion < 24) {
+      if (oldVersion < ver) {
+        await _createTableConfig(batch);
         await _createTableCourse(batch);
+        await _createTableCourseCompl(batch);
         await _createTableItems(batch);
         await _createTableWebinars(batch);
+        await _createTableNotify(batch);
 
-        await deleteDir('${documentsDirectory.path}/storage');
+        Directory('${documentsDirectory.path}/storage')
+            .deleteSync(recursive: true);
+        Directory('${documentsDirectory.path}/storage')
+            .createSync(recursive: true);
+        // await deleteDir('${documentsDirectory.path}/storage');
       }
       await batch.commit();
     });
@@ -53,7 +63,7 @@ class DBProvider {
     final directory = Directory(dir);
     var _folders = directory.listSync(recursive: true, followLinks: false);
     for (FileSystemEntity fl in _folders) {
-      fl.deleteSync();
+      fl.deleteSync(recursive: true);
     }
   }
 
@@ -64,7 +74,10 @@ class DBProvider {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT,
       password TEXT,
-      url TEXT
+      url TEXT,
+      notify TEXT,
+      newNotification INTEGER,
+      lastNotification INTEGER
     )''');
   }
 
@@ -74,10 +87,30 @@ class DBProvider {
     batch.execute('''CREATE TABLE Course (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       guid TEXT,
+      orderid TEXT,
       name TEXT,
       modulename TEXT,
       description TEXT,
+      cmode TEXT,
       load TINYINT(1),
+      rate NUMERIC,
+      dtend DATETIME
+    )''');
+  }
+
+  /// Create CourseCompl
+  Future<void> _createTableCourseCompl(Batch batch) async {
+    batch.execute('DROP TABLE IF EXISTS CourseCompl');
+    batch.execute('''CREATE TABLE CourseCompl (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guid TEXT,
+      orderid TEXT,
+      name TEXT,
+      modulename TEXT,
+      description TEXT,
+      cmode TEXT,
+      load TINYINT(1),
+      rate NUMERIC,
       dtend DATETIME
     )''');
   }
@@ -89,12 +122,19 @@ class DBProvider {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       courseid INTEGER,
       guid TEXT,
+      modulename TEXT,
       name TEXT,
       description TEXT,
       type TEXT,
       path TEXT,
       localpath TEXT,
       jsondata TEXT,
+      access TEXT,
+      history TEXT,
+      links TEXT,
+      rate INT,
+      time INT,
+      attempt TEXT,
       exec TINYINT(1),
       dtexec DATETIME,
       sync TINYINT(1),
@@ -121,6 +161,21 @@ class DBProvider {
     )''');
     batch.execute('''CREATE INDEX "webinars_event_index" ON "webinars" (
 	    "eventid"
+    )''');
+  }
+
+  /// Create Notify Config
+  Future<void> _createTableNotify(Batch batch) async {
+    batch.execute('DROP TABLE IF EXISTS Notify');
+    batch.execute('''CREATE TABLE Notify (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      subject TEXT,
+      body TEXT,
+      "from" TEXT,
+      dt DATETIME,
+      dtview DATETIME,
+      sync TINYINT(1),
+      remove TINYINT(1)
     )''');
   }
 }

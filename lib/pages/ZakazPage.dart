@@ -1,7 +1,11 @@
+import 'dart:async';
+
+import 'package:badges/badges.dart' as badge;
 import 'package:flutter/material.dart';
 import 'package:grouped_list/grouped_list.dart';
 import 'package:intl/intl.dart';
 import 'package:myapp/widgets/bottom_menu.dart';
+import 'package:myapp/widgets/config.dart';
 import 'package:myapp/widgets/http_post.dart';
 
 class ZakazPage extends StatefulWidget {
@@ -19,11 +23,22 @@ class _ZakazPageState extends State<ZakazPage> {
   int _stackToView = 0;
   var _currElement;
   String? _radio;
+  Timer? _timer;
 
   @override
   void initState() {
+    _timer = Timer.periodic(const Duration(minutes: 1), (Timer timer) async {
+      await initGlobalData();
+      setState(() {});
+    });
     super.initState();
     getData();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   void getData() async {
@@ -47,6 +62,34 @@ class _ZakazPageState extends State<ZakazPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Заказ курсов'),
+        actions: <Widget>[
+          Row(
+            children: <Widget>[
+              Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 0, 20, 0),
+                  child: (GlobalData.newNotification > 0)
+                      ? badge.Badge(
+                          position: badge.BadgePosition.topEnd(top: 0, end: 0),
+                          badgeContent: Text('${GlobalData.newNotification}',
+                              style: const TextStyle(color: Colors.white)),
+                          child: IconButton(
+                            icon: const Icon(Icons.notifications),
+                            onPressed: () async {
+                              Navigator.pushReplacementNamed(context, '/notify',
+                                  arguments: 10);
+                            },
+                          ),
+                        )
+                      : IconButton(
+                          icon: const Icon(Icons.notifications),
+                          onPressed: () {
+                            Navigator.pushReplacementNamed(context, '/notify',
+                                arguments: 10);
+                          },
+                        ))
+            ],
+          )
+        ],
       ),
       bottomNavigationBar: (isLoad) ? null : const BottomMenu(),
       body: Padding(

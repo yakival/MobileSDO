@@ -2,8 +2,12 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_lifecycle_aware/lifecycle.dart';
 import 'package:myapp/database/ItemModel.dart';
+import 'package:myapp/widgets/http_post.dart';
 import 'package:video_player/video_player.dart';
+
+import '../../widgets/timer_class.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   const VideoPlayerScreen({Key? key}) : super(key: key);
@@ -12,26 +16,34 @@ class VideoPlayerScreen extends StatefulWidget {
   _VideoPlayerScreenState createState() => _VideoPlayerScreenState();
 }
 
-class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
+class _VideoPlayerScreenState extends State<VideoPlayerScreen> with Lifecycle {
   VideoPlayerController? _controller;
   late Future<void> _initializeVideoPlayerFuture;
+  Item _args = Item();
+  AViewModel model = AViewModel();
 
   @override
   void initState() {
     super.initState();
+    getLifecycle().addObserver(model);
   }
 
   @override
   void dispose() {
     // Ensure disposing of the VideoPlayerController to free up resources.
     _controller?.dispose();
-
+    getLifecycle().removeObserver(model);
+    model.destroy();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final args = ModalRoute.of(context)!.settings.arguments as Item;
+    model.setData(args);
+    setState(() {
+      _args = args;
+    });
     /*
     if (_controller == null) {
       // Create and store the VideoPlayerController. The VideoPlayerController

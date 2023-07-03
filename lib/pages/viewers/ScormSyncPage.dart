@@ -29,6 +29,7 @@ class _ScormSyncPageState extends State<ScormSyncPage> {
   @override
   Widget build(BuildContext context) {
     final args = ModalRoute.of(context)!.settings.arguments as Item;
+    args.jsondata = args.jsondata!.replaceAll("\\", "");
 
     return Scaffold(
         appBar: AppBar(
@@ -62,6 +63,8 @@ class _ScormSyncPageState extends State<ScormSyncPage> {
                           javascriptMode: JavascriptMode.unrestricted,
                           debuggingEnabled: true,
                           allowsInlineMediaPlayback: true,
+                          initialMediaPlaybackPolicy:
+                              AutoMediaPlaybackPolicy.always_allow,
                           onPageStarted: (url) async {},
                           onPageFinished: (finish) async {
                             await _myController.runJavascript(

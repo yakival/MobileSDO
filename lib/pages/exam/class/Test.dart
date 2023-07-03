@@ -3,6 +3,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:myapp/pages/exam/class/Access.dart';
 import 'package:myapp/pages/exam/class/Question.dart';
 import 'package:myapp/pages/exam/class/Section.dart';
 
@@ -27,6 +28,7 @@ class TTest {
   int? MaxScore;
   List<TSection>? sections;
   String? localpath;
+  List<TAccess>? access;
 
   TTest(
       {this.Id,
@@ -48,6 +50,7 @@ class TTest {
       this.TotScore,
       this.MaxScore,
       this.sections,
+      this.access,
       this.localpath});
 
   factory TTest.fromMap(Map<String, dynamic> json) => TTest(
@@ -70,10 +73,14 @@ class TTest {
         TotScore: json["TotScore"],
         MaxScore: json["MaxScore"],
         sections: toSection(json["sections"].toList()),
+        access: toAccess(json["access"].toList()),
       );
 
   static List<TSection> toSection(List<dynamic> sections) =>
       [for (var v in sections) TSection.fromMap(v)];
+
+  static List<TAccess> toAccess(List<dynamic> access) =>
+      [for (var v in access) TAccess.fromMap(v)];
 
   Map<String, dynamic> toMap() => {
         "id": Id,
@@ -94,11 +101,15 @@ class TTest {
         "CountQuestions": CountQuestions,
         "TotScore": TotScore,
         "MaxScore": MaxScore,
-        "sections": fromSection(sections)
+        "sections": fromSection(sections),
+        "access": fromAccess(access)
       };
 
   static List<dynamic> fromSection(List<TSection>? sections) =>
       [for (var v in sections!) v.toMap()];
+
+  static List<dynamic> fromAccess(List<TAccess>? access) =>
+      [for (var v in access!) v.toMap()];
 }
 
 class TestPreview extends StatelessWidget {
@@ -303,7 +314,7 @@ class QuestionList extends StatelessWidget {
       return DataRow(
         cells: [
           DataCell(Container(
-              width: 10, //SET width
+              width: 20, //SET width
               child: Align(
                   alignment: Alignment.centerLeft, child: Text(i.toString())))),
           DataCell(

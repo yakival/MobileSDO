@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:badges/badges.dart' as badge;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:myapp/database/WebinarModel.dart';
@@ -18,10 +21,21 @@ class WebinarPage extends StatefulWidget {
 class _WebinarPageState extends State<WebinarPage> {
   List<Webinar> _list = [];
   var isrun = false;
+  Timer? _timer;
 
   @override
   void initState() {
+    _timer = Timer.periodic(const Duration(minutes: 1), (Timer timer) async {
+      await initGlobalData();
+      setState(() {});
+    });
     super.initState();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   Future<List<Webinar>> _getData(context) async {
@@ -36,6 +50,34 @@ class _WebinarPageState extends State<WebinarPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Вебинары'),
+        actions: <Widget>[
+          Row(
+            children: <Widget>[
+              Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 0, 20, 0),
+                  child: (GlobalData.newNotification > 0)
+                      ? badge.Badge(
+                          position: badge.BadgePosition.topEnd(top: 0, end: 0),
+                          badgeContent: Text('${GlobalData.newNotification}',
+                              style: const TextStyle(color: Colors.white)),
+                          child: IconButton(
+                            icon: const Icon(Icons.notifications),
+                            onPressed: () async {
+                              Navigator.pushReplacementNamed(context, '/notify',
+                                  arguments: 10);
+                            },
+                          ),
+                        )
+                      : IconButton(
+                          icon: const Icon(Icons.notifications),
+                          onPressed: () {
+                            Navigator.pushReplacementNamed(context, '/notify',
+                                arguments: 10);
+                          },
+                        ))
+            ],
+          )
+        ],
       ),
       bottomNavigationBar: const BottomMenu(),
       body: FutureBuilder<List<Webinar>>(

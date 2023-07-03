@@ -37,24 +37,33 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.2
 
+  archive: ^3.3.7
   flutter_lints: ^1.0.0
   http: any
   intl: ^0.17.0
-  native_pdf_view: ^5.0.0
+  pdfx: ^2.3.0
   video_player:
   photo_view:
   http_server:
-  webview_flutter: ^3.0.1
-  open_file: 
+  webview_flutter: ^2.8.0
+  open_file_plus:
   #xml2json:
   connectivity_plus:
-  drag_and_drop_gridview:
+  connectivity_plus_web: ^1.2.5
+  flutter_draggable_gridview:
+  #flutter_reorderable_grid_view:
   android_alarm_manager_plus:
   flutter_local_notifications:
   url_launcher:
-  flutter_html:
+  flutter_html: 3.0.0-alpha.5
   grouped_list:
   disk_space:
+  html_editor_enhanced: ^2.5.1
+  file_picker: ^5.2.0+1
+  windows1251:
+  simple_html_css:
+  badges: ^2.0.3
+  flutter_lifecycle_aware: ^0.0.3
 
 dev_dependencies:
   flutter_test:
@@ -79,6 +88,7 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
+    - assets/
     - assets/Frameset.zip
     - assets/index.txt
 

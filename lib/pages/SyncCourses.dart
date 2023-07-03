@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:myapp/database/ConfigModel.dart';
 import 'package:myapp/database/CourseModel.dart';
 import 'package:myapp/database/Database.dart';
 import 'package:myapp/database/ItemModel.dart';
@@ -30,6 +32,7 @@ class _SyncCoursesState extends State<SyncCourses> {
 
   Future<List<dynamic>> _getData(context) async {
     List<dynamic> _listCourse = [];
+    List<dynamic> _listCourse1 = [];
     List<dynamic> _listItem = [];
 
     if (_list.isEmpty) {
@@ -39,7 +42,20 @@ class _SyncCoursesState extends State<SyncCourses> {
         return _list;
       }
 
+      // ПОЛУЧАЕМ НАСТРОЙКИ Notify
       var res_ = await httpAPI("close/students/mobileApp.asp",
+          '{"command": "getNotifySetup"}', context);
+      await updateConfig(Config(
+          username: GlobalData.username,
+          password: GlobalData.password,
+          url: GlobalData.baseUrl,
+          notify: json.encode(res_),
+          newNotification: GlobalData.newNotification,
+          lastNotification: GlobalData.lastNotification));
+      await initGlobalData();
+
+      // ПОЛУЧАЕМ ВЕБИНАРЫ
+      res_ = await httpAPI("close/students/mobileApp.asp",
           '{"command": "getWebinars"}', context);
       var _listWebinar = (res_ as List).toList();
       deleteAllWebinar();
@@ -56,6 +72,7 @@ class _SyncCoursesState extends State<SyncCourses> {
         var res = await getItemGuid(itm["guid"]!);
         itm["checked"] = (res == null) ? false : true;
         itm["courseid"] = null;
+        //itm["id"] = (res != null) ? res.id : null;
         _list.add(itm);
       }
 
@@ -72,14 +89,18 @@ class _SyncCoursesState extends State<SyncCourses> {
       for (var itm in list1) {
         if (File(itm.localpath!).existsSync()) {
           final file = File(itm.localpath!);
-          await file.delete();
+          await file.parent.delete(recursive: true);
         }
         await deleteItem(itm);
       }
+      //for(var el in _list) {
+      //  Item itm = Item.fromMap(el);
+      //  await updateItem(itm);
+      //}
 
       // ПОЛУЧАЕМ КУРСЫ
       res_ = await httpAPI(
-          "close/students/mobileApp.asp", '{"command": "getCourses"}', context);
+          "close/students/mobileApp.asp", '{"command": "getCourses", "cmode": ""}', context);
       _listCourse =
           (res_ as List).toList(); // map((i) => {"id": i["id"], }).toList();
       for (var itm in _listCourse) {
@@ -87,6 +108,7 @@ class _SyncCoursesState extends State<SyncCourses> {
         itm["checked"] = (res == null) ? false : true;
         if (itm["checked"]) itm["id"] = res.id;
         itm["description"] = "КУРС";
+        itm["cmode"] = null;
         _list.add(itm);
       }
 
@@ -97,6 +119,12 @@ class _SyncCoursesState extends State<SyncCourses> {
         _listItem = (res_ as List).toList();
         for (var itm in _listItem) {
           itm["load"] = false;
+          if(itm["access"] != null){
+            itm["access"] = jsonEncode(itm["access"]);
+          }
+          if(itm["history"] != null){
+            itm["history"] = jsonEncode(itm["history"]);
+          }
           var res = await getItemGuid(itm["guid"]!);
           itm["checked"] = (res == null) ? false : true;
           itm["courseid"] = itmc["guid"];
@@ -117,7 +145,7 @@ class _SyncCoursesState extends State<SyncCourses> {
           for (var itm in list) {
             if (File(itm.localpath!).existsSync()) {
               final file = File(itm.localpath!);
-              await file.delete();
+              await file.parent.delete(recursive: true);
             }
             await deleteItem(itm);
           }
@@ -139,13 +167,37 @@ class _SyncCoursesState extends State<SyncCourses> {
         for (Item itm_ in items) {
           if (File(itm_.localpath!).existsSync()) {
             final file = File(itm_.localpath!);
-            await file.delete();
+            file.parent.deleteSync(recursive: true);
           }
           await deleteItem(itm_);
         }
         await deleteCourse(itm.id!);
       }
+
+      // ПОЛУЧАЕМ КУРСЫ COMPLETED
+      res_ = await httpAPI(
+          "close/students/mobileApp.asp", '{"command": "getCourses", "cmode": "completed"}', context);
+      _listCourse1 =
+          (res_ as List).toList(); // map((i) => {"id": i["id"], }).toList();
+      for (var itm in _listCourse1) {
+        var res = await getCourseGuidCompl(itm["guid"]!);
+        if(res == null){
+          itm["cmode"] = "completed";
+          //var path = "/close/modules/print_templates/?orderid=" + itm["orderid"];
+          //await downloadFileAPI(path, itm["guid"] + ".pdf");
+          await newCourseCompl(Course.fromMap(itm));
+        }else{
+          Course val = res as Course;
+          val.rate = itm["rate"];
+          if(val.rate == 100) {
+            //var path = "/close/modules/print_templates/?orderid=" + val.orderid!;
+            //await downloadFileAPI(path, val.guid! + ".pdf");
+          }
+          await updateCourseCompl(val);
+        }
+      }
     }
+
     return _list;
   }
 
@@ -174,8 +226,12 @@ class _SyncCoursesState extends State<SyncCourses> {
             }
             var fn = itm["path"]!.split('/').last;
             var ext = itm["path"]!.split('.').last;
-            itm["localpath"] = '${appDir.path}/storage/$fn';
-            if ((itm["type"] != "SCORM") && (itm["type"] != "test")) {
+            itm["localpath"] = '${appDir.path}/storage/${itm["guid"]}/$fn';
+            if ((itm["type"] != "SCORM") &&
+                (itm["type"] != "test") &&
+                (itm["type"] != "html") &&
+                (itm["type"] != "CMP") &&
+                (itm["type"] != "WRITING")) {
               itm["type"] = ext;
             }
             itm["load"] = false;
@@ -186,12 +242,54 @@ class _SyncCoursesState extends State<SyncCourses> {
           setState(() {});
         } else {
           if (key) {
-            if (itm["type"] == "test" || itm["type"] == "SCORM") {
-              Item itm_ = await getItemGuid(itm["guid"]);
+            Item itm_ = await getItemGuid(itm["guid"]);
+            itm_.name = itm["name"];
+            itm_.description = itm["description"];
+            itm_.path = itm["path"];
+            if ((itm["type"] == "test") || (itm["type"] == "SCORM")) {
+              itm_.description = itm["description"];
+            }
+            if ((itm["type"] != "SCORM") &&
+                (itm["type"] != "test") &&
+                (itm["type"] != "html") &&
+                (itm["type"] != "CMP")) {
               itm_.description = itm["description"];
               itm_.menu = itm["menu"];
-              await updateItem(itm_);
             }
+            if ((itm["type"] == "WRITING")) {
+              itm_.name = itm["name"];
+              itm_.jsondata = itm["jsondata"];
+              itm_.description = itm["description"];
+              itm_.attempt = itm["attempt"];
+              if (itm_.attempt == "null") {
+                if (itm_.name!.contains("%failed%")) {
+                  itm_.jsondata = itm["jsondata"];
+                }
+              }
+            }
+            if ((itm["type"] != "test") &&
+                (itm["type"] != "WRITING")) {
+              itm_.rate = itm["rate"];
+              if ((itm_.time ?? 0) > (itm["time"] ?? 0)) {
+                await httpAPI(
+                    "close/students/sync.asp",
+                    '{"id":"' +
+                        itm_.guid! +
+                        '", "type":"RATEBOOK", "idlog": null, "data":' +
+                        (itm_.time! - itm["time"]).toString() +
+                        '}',
+                    context);
+              } else {
+                itm_.time = itm["time"];
+              }
+            }
+            itm_.links = itm["links"];
+            itm_.access = itm["access"];
+            itm_.history = itm["history"];
+            itm_.sync = false;
+            await updateItem(itm_);
+          }else{
+            await updateCourse(Course.fromMap(itm));
           }
         }
       }

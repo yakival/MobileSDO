@@ -1,14 +1,16 @@
 // ignore_for_file: constant_identifier_names, non_constant_identifier_names, unnecessary_new
 
+import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter_html/flutter_html.dart';
 import 'dart:io';
 
 import 'package:myapp/pages/exam/class/Answer.dart';
 import 'package:myapp/pages/exam/class/Test.dart';
 import 'package:myapp/pages/exam/class/Var.dart';
-import 'package:drag_and_drop_gridview/devdrag.dart';
+import 'package:flutter_draggable_gridview/flutter_draggable_gridview.dart';
 
 class TQuestion {
   String? Id;
@@ -109,18 +111,20 @@ class TQuestion {
 }
 
 class TQuestionPreview extends StatefulWidget {
-  TQuestionPreview({
+  const TQuestionPreview({
     Key? key,
     required this.test,
     required this.question,
     required this.dir,
     required this.onSelect,
+    required this.showAnswer,
   }) : super(key: key);
 
   final String dir;
   final TTest test;
   final TQuestion question;
   final ValueChanged<TQuestion?> onSelect;
+  final bool showAnswer;
 
   @override
   State<TQuestionPreview> createState() => _TQuestionPreview();
@@ -129,7 +133,10 @@ class TQuestionPreview extends StatefulWidget {
 class _TQuestionPreview extends State<TQuestionPreview> {
   String? radio_;
   late TextEditingController _controller;
-  late bool _prepared = false;
+  bool _prepared = false;
+  bool _showAnswer = false;
+  late String _currQuestion = "";
+  List<DraggableGridItem> _listOfDraggableGridItem = [];
 
   static const int CQTOneFromMany = 1; // один из многих
   static const int CQTManyFromMany = 2; // многие из многих
@@ -148,6 +155,7 @@ class _TQuestionPreview extends State<TQuestionPreview> {
   double? width;
   double? height;
   List<TAnswer> orderList = [];
+  List<Widget> listOfWidgets = [];
   var _img;
 
   Future<Uint8List> getImagePoint(String? pos) async {
@@ -190,35 +198,155 @@ class _TQuestionPreview extends State<TQuestionPreview> {
   }
   ////////////////////////////////////////////////////////////////////
 
+  Future<Uint8List> getImageArea(List<TAnswer> list) async {
+    List<int> imageData = [];
+    final file = File('${widget.dir}/${widget.question.Img}');
+    imageData = await file.readAsBytes();
+
+    ui.Image image = await decodeImageFromList(Uint8List.fromList(imageData));
+    var pictureRecorder = ui.PictureRecorder();
+    var canvas = Canvas(pictureRecorder);
+    var paint = Paint();
+    paint.isAntiAlias = true;
+    var src = Rect.fromLTWH(
+        0.0, 0.0, image.width.toDouble(), image.height.toDouble());
+    var dst = Rect.fromLTWH(
+        0.0, 0.0, image.width.toDouble(), image.height.toDouble());
+    canvas.drawImageRect(image, src, dst, paint);
+
+    for (TAnswer ans in list) {
+      var mas = ans.Txt!.split(";");
+      var mas0 = mas[0].split(":");
+      var mas1 = mas[1].split(":");
+      var dx0 = int.parse(mas0[0]).toDouble();
+      var dy0 = int.parse(mas0[1]).toDouble();
+      var dx1 = int.parse(mas1[0]).toDouble();
+      var dy1 = int.parse(mas1[1]).toDouble();
+      paint.color = Colors.lime;
+      paint.strokeWidth = 4;
+
+      var dashWidth = 7;
+      var dashSpace = 3;
+      double start = 0;
+      final space = (dashSpace + dashWidth);
+
+      start = dx0;
+      while (start < (dx1)) {
+        canvas.drawLine(
+            Offset(start, dy0), Offset(start + dashWidth, dy0), paint);
+        canvas.drawLine(
+            Offset(start, dy1), Offset(start + dashWidth, dy1), paint);
+        start += space;
+      }
+      start = dy0;
+      while (start < (dy1)) {
+        canvas.drawLine(
+            Offset(dx0, start), Offset(dx0, start + dashWidth), paint);
+        canvas.drawLine(
+            Offset(dx1, start), Offset(dx1, start + dashWidth), paint);
+        start += space;
+      }
+    }
+
+    var pic = pictureRecorder.endRecording();
+    ui.Image img = await pic.toImage(image.width, image.height);
+    var byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    var buffer = byteData!.buffer.asUint8List();
+    return buffer;
+  }
+  ////////////////////////////////////////////////////////////////////
+
   @override
   void initState() {
     super.initState();
 
+    _prepared = false;
     _prepareData();
+  }
+
+  List<TAnswer> shuffle(List<TAnswer> items) {
+    var random = new Random();
+
+    // Go through all elements.
+    for (var i = items.length - 1; i > 0; i--) {
+      var n = random.nextInt(i + 1);
+
+      var temp = items[i];
+      items[i] = items[n];
+      items[n] = temp;
+    }
+
+    return items;
   }
 
   void _prepareData() async {
     if (widget.question.IdType == CQTPicture) {
-      _img ??= await getImagePoint(widget.question.answers![0].answer);
+      _img = null;
+      if (widget.showAnswer) {
+        _img ??= await getImageArea(widget.question.answers!);
+      } else {
+        _img ??= await getImagePoint(widget.question.answers![0].answer);
+      }
     }
     orderList = widget.question.answers!; //.map((ans) => ans).toList();
 
     if (widget.question.IdType == CQTOrder) {
-      orderList.sort((a, b) {
-        int a_ = (a.answer?.isNotEmpty != null) ? int.parse(a.answer!) : a.Ord!;
-        int b_ = (b.answer?.isNotEmpty != null) ? int.parse(b.answer!) : b.Ord!;
-        return a_.compareTo(b_);
-      });
-      var pos = 0;
-      for (TAnswer ans in orderList) {
-        ans.answer = pos.toString();
-        pos++;
-        //if (ans.Id == tempold.Id) ans.answer = newIndex.toString();
-        //if (ans.Id == tempnew.Id) ans.answer = oldIndex.toString();
+      if (widget.showAnswer) {
+        orderList.sort((p1, p2) {
+          return Comparable.compare(p1.Ord!, p2.Ord!);
+        });
+      } else {
+        if (orderList[0].answer?.isNotEmpty == null) {
+          orderList = shuffle(orderList);
+          var pos = 0;
+          for (TAnswer ans in orderList) {
+            ans.answer = pos.toString();
+            pos++;
+          }
+        } else {
+          orderList.sort((p1, p2) {
+            return Comparable.compare(p1.answer!, p2.answer!);
+          });
+        }
       }
+      _prepareOrderList();
     }
     _prepared = true;
     setState(() {});
+  }
+
+  void _prepareOrderList() async {
+    _listOfDraggableGridItem = List.generate(orderList.length, (index) =>
+        DraggableGridItem(child: (orderList[index].Img!.isNotEmpty)
+            ? Card(child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Dimens.padding_small,
+            vertical: Dimens.padding_small,
+          ),
+          child: Image.file(
+            File('${widget.dir}/${orderList[index].Img}'),
+            fit: BoxFit.cover,
+          ),
+          //width: width,
+          //height: height,
+        ))
+            : Card(
+            clipBehavior: Clip.hardEdge,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: Dimens.padding_small,
+                vertical: Dimens.padding_small,
+              ),
+              child: Center(
+                  child: Text(
+                      removeAllHtmlTags(orderList[index].Txt!) +
+                          " (№" +
+                          (index + 1).toString() +
+                          ")")),
+              //width: width,
+              //height: height,
+            )), isDraggable: true)
+    );
   }
 
   void _handleTap(value) {
@@ -259,22 +387,39 @@ class _TQuestionPreview extends State<TQuestionPreview> {
 
   @override
   Widget build(BuildContext context) {
-    _prepareData();
+    if (_showAnswer != widget.showAnswer ||
+        _currQuestion != widget.question.Id) {
+      _showAnswer = widget.showAnswer;
+      _currQuestion = widget.question.Id!;
+      _prepared = false;
+    }
+    if (!_prepared) Future.delayed(Duration.zero, () => _prepareData());
     if (!_prepared) return const CircularProgressIndicator();
 
     switch (widget.question.IdType) {
       case CQTOneFromMany:
       case CQTManyFromMany:
       case CQTYesNo:
-        if (widget.question.IdType == CQTOneFromMany) {
+        if (widget.question.IdType == CQTOneFromMany ||
+            widget.question.IdType == CQTYesNo) {
+          radio_ = null;
           for (TAnswer ans in widget.question.answers!) {
-            if (ans.answer?.isNotEmpty != null) {
-              radio_ = ans.Id;
-              break;
+            if (widget.showAnswer) {
+              if ((ans.Weight ?? 0) > 0) {
+                radio_ = ans.Id;
+                break;
+              }
+            } else {
+              if (ans.answer?.isNotEmpty != null) {
+                radio_ = ans.Id;
+                break;
+              }
             }
           }
         }
-        return Column(children: <Widget>[
+        return SingleChildScrollView(
+            controller: _scrollController,
+            child: Column(children: <Widget>[
           Header(),
           Table(
             columnWidths: const <int, TableColumnWidth>{
@@ -287,12 +432,16 @@ class _TQuestionPreview extends State<TQuestionPreview> {
                 .map((e) => TableRow(
                       children: [
                         TableCell(
-                            child: (widget.question.IdType == CQTOneFromMany)
+                            child: (widget.question.IdType == CQTOneFromMany) ||
+                                    (widget.question.IdType == CQTYesNo)
                                 ? Radio(
                                     value: e.Id!,
                                     groupValue: radio_,
                                     onChanged: (String? value) {
                                       setState(() {
+                                        if (widget.showAnswer) {
+                                          return;
+                                        }
                                         radio_ = value!;
                                         for (TAnswer ans
                                             in widget.question.answers!) {
@@ -306,9 +455,14 @@ class _TQuestionPreview extends State<TQuestionPreview> {
                                     },
                                   )
                                 : Checkbox(
-                                    value: (e.answer?.isNotEmpty != null),
+                                    value: (widget.showAnswer)
+                                        ? ((e.Weight ?? 0) > 0)
+                                        : (e.answer?.isNotEmpty != null),
                                     onChanged: (value) {
                                       setState(() {
+                                        if (widget.showAnswer) {
+                                          return;
+                                        }
                                         (value!)
                                             ? e.answer = "1"
                                             : e.answer = null;
@@ -340,9 +494,22 @@ class _TQuestionPreview extends State<TQuestionPreview> {
                 .toList(),
           ),
           Footer(),
-        ]);
+        ]));
       case CQTInputField:
-        return Column(children: <Widget>[
+        var ans_ = "";
+        if (widget.showAnswer) {
+          for (TAnswer ans in widget.question.answers!) {
+            if ((ans.Weight ?? 0) > 0) {
+              ans_ += '<li>${ans.Txt}</li>';
+              break;
+            }
+          }
+        }
+        ans_ = "<ul>" + ans_ + "</ul>";
+
+        return SingleChildScrollView(
+    controller: _scrollController,
+    child: Column(children: <Widget>[
           Header(),
           Container(
               padding: const EdgeInsets.all(20.00),
@@ -353,15 +520,21 @@ class _TQuestionPreview extends State<TQuestionPreview> {
                 controller: TextEditingController(
                     text: widget.question.answers?.first.answer),
                 onSubmitted: (value) {
+                  if (widget.showAnswer) {
+                    return;
+                  }
                   for (TAnswer ans in widget.question.answers!) {
                     ans.answer = value;
                   }
                 },
               )),
+          (widget.showAnswer) ? Html(data: ans_) : Container(),
           Footer(),
-        ]);
+        ]));
       case CQTSootv:
-        return Column(children: <Widget>[
+        return SingleChildScrollView(
+    controller: _scrollController,
+    child: Column(children: <Widget>[
           Header(),
           Table(
             defaultVerticalAlignment: TableCellVerticalAlignment.top,
@@ -403,9 +576,14 @@ class _TQuestionPreview extends State<TQuestionPreview> {
                             child: Align(
                                 alignment: Alignment.centerLeft,
                                 child: DropdownButton(
-                                    value: e.answer,
+                                    value: (widget.showAnswer)
+                                        ? e.vars![0].Id
+                                        : e.answer,
                                     onChanged: (newValue) {
                                       setState(() {
+                                        if (widget.showAnswer) {
+                                          return;
+                                        }
                                         e.answer = newValue as String?;
                                       });
                                     },
@@ -422,41 +600,80 @@ class _TQuestionPreview extends State<TQuestionPreview> {
                 .toList(),
           ),
           Footer(),
-        ]);
+        ]));
       case CQTOrder:
-        return Column(children: <Widget>[
-          Header(),
-          DragAndDropGridView(
-            controller: _scrollController,
-            padding: const EdgeInsets.all(20),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 1,
-              childAspectRatio: 2.5,
+        return SafeArea(child: DraggableGridViewBuilder(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: MediaQuery.of(context).size.width / (MediaQuery.of(context).size.height / 3),
+            ),
+            children: _listOfDraggableGridItem,
+            isOnlyLongPress: false,
+            dragCompletion: (List<DraggableGridItem> list, int beforeIndex, int afterIndex) {
+              final tempold = orderList[beforeIndex];
+              final tempnew = orderList[afterIndex];
+              orderList[beforeIndex] = tempnew; orderList[beforeIndex].answer = beforeIndex.toString();
+              orderList[afterIndex] = tempold; orderList[afterIndex].answer = afterIndex.toString();
+
+              for (TAnswer ans in orderList) {
+                widget.question.answers!.firstWhere((sl) => sl.Id == ans.Id).answer = ans.answer;
+              }
+              _prepareOrderList();
+              setState(() {});
+            },
+          dragFeedback: (List<DraggableGridItem> list, int index) {
+            return Container(
+              child: list[index].child,
+              width: 200,
+              height: 150,
+            );
+          },
+          dragPlaceHolder: (List<DraggableGridItem> list, int index) {
+            return PlaceHolderWidget(
+              child: Container(
+                color: Colors.white,
+              ),
+            );
+          },
+          ));
+          /*
+          DraggableGridViewBuilder(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: MediaQuery.of(context).size.width /
+                  (MediaQuery.of(context).size.height / 3),
             ),
             itemBuilder: (context, index) => Card(
               elevation: 2,
               child: LayoutBuilder(
                 builder: (context, constrains) {
                   if (variableSet == 0) {
-                    height = constrains.maxHeight;
-                    width = constrains.maxWidth;
+                    height = constrains.minHeight;
+                    width = constrains.minWidth;
                     variableSet++;
                   }
-                  return GridTile(
-                      child: Container(
-                          child: Column(children: <Widget>[
-                    (orderList[index].Img!.isNotEmpty)
-                        ? Container(
-                            padding: const EdgeInsets.fromLTRB(
-                                0.00, 15.00, 0.00, 0.00),
-                            child: Image.file(
-                              File('${widget.dir}/${orderList[index].Img}'),
-                            ),
-                            height: height,
-                            width: width,
-                          )
-                        : Container(),
-                  ])));
+                  return (orderList[index].Img!.isNotEmpty)
+                      ? Container(
+                          padding: const EdgeInsets.fromLTRB(
+                              0.00, 15.00, 0.00, 0.00),
+                          child: Image.file(
+                            File('${widget.dir}/${orderList[index].Img}'),
+                          ),
+                          width: width,
+                          height: height,
+                        )
+                      : Container(
+                          padding: const EdgeInsets.fromLTRB(
+                              0.00, 15.00, 0.00, 0.00),
+                          child: Center(
+                              child: Text(
+                                  removeAllHtmlTags(orderList[index].Txt!) +
+                                      " (№" +
+                                      (index + 1).toString() +
+                                      ")")),
+                          width: width,
+                          height: height,
+                        );
                 },
               ),
             ),
@@ -477,23 +694,28 @@ class _TQuestionPreview extends State<TQuestionPreview> {
               for (TAnswer ans in widget.question.answers!) {
                 ans.answer = pos.toString();
                 pos++;
-                //if (ans.Id == tempold.Id) ans.answer = newIndex.toString();
-                //if (ans.Id == tempnew.Id) ans.answer = oldIndex.toString();
               }
 
               setState(() {});
             },
-          ),
-          Footer(),
-        ]);
+          );
+           */
+        //  Footer(),
+        //]);
       case CQTPicture:
-        return Column(children: <Widget>[
+        return SingleChildScrollView(
+    controller: _scrollController,
+    child: Column(children: <Widget>[
           Header(),
           SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: GestureDetector(
                 child: _img != null ? Image.memory(_img) : Container(),
+                //onLongPressEnd:
                 onLongPressEnd: (details) async {
+                  if (widget.showAnswer) {
+                    return;
+                  }
                   String val = details.localPosition.dx.toInt().toString() +
                       ":" +
                       details.localPosition.dy.toInt().toString();
@@ -504,9 +726,11 @@ class _TQuestionPreview extends State<TQuestionPreview> {
                   setState(() {});
                 },
               )),
-        ]);
+        ]));
       case CQTLargeField:
-        return Column(children: <Widget>[
+        return SingleChildScrollView(
+    controller: _scrollController,
+    child: Column(children: <Widget>[
           Header(),
           Container(
               padding: const EdgeInsets.all(20.00),
@@ -531,9 +755,11 @@ class _TQuestionPreview extends State<TQuestionPreview> {
                     }
                   })),
           Footer(),
-        ]);
+        ]));
       case CQTManyFields:
-        return Column(children: <Widget>[
+        return SingleChildScrollView(
+    controller: _scrollController,
+    child: Column(children: <Widget>[
           Header(),
           Table(
             defaultVerticalAlignment: TableCellVerticalAlignment.top,
@@ -548,14 +774,14 @@ class _TQuestionPreview extends State<TQuestionPreview> {
                                 child: Column(children: <Widget>[
                                   (e.Txt!
                                           .replaceAll("<p><br></p>", "")
+                                          .replaceAll("&nbsp;", "")
                                           .isNotEmpty)
                                       ? Container(
                                           padding: const EdgeInsets.fromLTRB(
                                               0.00, 20.00, 0.00, 0.00),
                                           child: Align(
                                               alignment: Alignment.centerLeft,
-                                              child: Text(
-                                                  removeAllHtmlTags(e.Txt!))))
+                                              child: Html(data: e.Txt!)))
                                       : Container(),
                                   (e.Img!.isNotEmpty)
                                       ? Container(
@@ -576,7 +802,9 @@ class _TQuestionPreview extends State<TQuestionPreview> {
                                   border: OutlineInputBorder(),
                                 ),
                                 controller:
-                                    TextEditingController(text: e.answer),
+                                    TextEditingController(
+                                        text: e.answer,
+                                    ),
                                 onSubmitted: (value) {
                                   setState(() {
                                     e.answer = value;
@@ -589,9 +817,70 @@ class _TQuestionPreview extends State<TQuestionPreview> {
                 .toList(),
           ),
           Footer(),
-        ]);
+        ]));
+      case CQTShortFields:
+        List<String> tags = [];
+        String txt = widget.question.answers![0].Txt! +
+            "<txt id='0' ></txt>" + widget.question.answers![0].Tag!;
+        tags.add("txt");
+
+        CustomRenderMatcher txtMatcher() => (context) => context.tree.element?.localName == 'txt';
+        CustomRenderMatcher imgMatcher() => (context) => context.tree.element?.localName == 'img';
+
+        return
+          SingleChildScrollView(
+          scrollDirection: Axis.vertical,
+          child: Column(children: <Widget>[
+              Header(),
+          Html(
+            data: txt,
+            tagsList: Html.tags..addAll(tags),
+            customRenders: {
+              txtMatcher(): CustomRender.widget(widget: (context, buildChildren) {
+                var num = int.parse(context.tree.elementId);
+                var q = "" + widget.question.vars![0].Txt!;
+                var a = "" + ((widget.question.answers![0].answer != null)?widget.question.answers![0].answer!:"");
+                //myController[num - 1].value = TextEditingValue(text: (widget.showAnswer)?q:a);
+                return Container(
+                    padding: const EdgeInsets.all(5.00),
+                    child:
+                    TextFormField(
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                      ),
+                      controller: //myController[num - 1],
+                      TextEditingController(text: (widget.showAnswer)?q:a),
+                      //autofocus: (num ==1)?true:false,
+                      //focusNode: myFocusNode[num - 1],
+                      //textInputAction: TextInputAction.next,
+                      //onEditingComplete: _node.nextFocus,
+                      onFieldSubmitted: (value) {
+                        if(!widget.showAnswer) {
+                          widget.question.answers![0].answer = value;
+                        }
+                      },
+                    ));
+              }),
+              imgMatcher(): CustomRender.widget(widget: (context, buildChildren) {
+                return Container(
+                    padding: const EdgeInsets.fromLTRB(
+                        0.00, 5.00, 0.00, 0.00),
+                    child: Image.file(
+                      File('${widget.dir}/${widget.question.answers![0].Img}'),
+                    ));
+              }),
+            },
+          )
+          ]));
       default:
         return (Container());
     }
   }
+
+
+}
+class Dimens {
+  // Padding
+  static const padding_small = 4.0;
+  static const padding_normal = 8.0;
 }

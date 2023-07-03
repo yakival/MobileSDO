@@ -41,7 +41,7 @@ class _BottomMenu extends State<BottomMenu> {
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.settings),
-          label: 'Портал',
+          label: 'Настройки',
         ),
       ],
       currentIndex: _selectedIndex,
