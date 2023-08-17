@@ -28,7 +28,7 @@ class DBProvider {
           .createSync(recursive: true);
     }
     String path = join(documentsDirectory.path, dname);
-    const ver = 87;
+    const ver = 94;
     return await openDatabase(path, version: ver, onOpen: (db) {},
         onCreate: (Database db, int version) async {
       var batch = db.batch();

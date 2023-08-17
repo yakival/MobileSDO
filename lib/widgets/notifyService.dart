@@ -108,6 +108,7 @@ Future<void> _showGroupedNotifications(Notify item) async {
 
   // example based on https://developer.android.com/training/notify-user/group.html
   // 1
+  /*
   const AndroidNotificationDetails firstNotificationAndroidSpecifics =
       AndroidNotificationDetails(groupChannelId, groupChannelName,
           channelDescription: groupChannelDescription,
@@ -119,6 +120,7 @@ Future<void> _showGroupedNotifications(Notify item) async {
 
   await flutterNotificationPlugin?.show(1, 'Alex Faarborg',
       'You will not believe...', firstNotificationPlatformSpecifics);
+   */
 
   // 2
   const AndroidNotificationDetails secondNotificationAndroidSpecifics =

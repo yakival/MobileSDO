@@ -27,6 +27,7 @@ class TQuestion {
   bool? IsMarked;
   bool? IsRight;
   bool? DoShuffle;
+  bool? Active;
   int? CountAnswers;
   int? Points;
   int? iTime;
@@ -45,6 +46,7 @@ class TQuestion {
       this.Transhoid,
       this.IsDef,
       this.DoShuffle,
+      this.Active,
       this.Ord,
       this.Txt,
       this.IsMarked,
@@ -66,6 +68,7 @@ class TQuestion {
       Transhoid: json["Transhoid"],
       IsDef: json["IsDef"],
       DoShuffle: json["DoShuffle"],
+      Active: json["Active"],
       Ord: json["Ord"],
       Txt: json["Txt"],
       IsMarked: json["IsMarked"],
@@ -94,6 +97,7 @@ class TQuestion {
         "Weight": Weight,
         "Ord": Ord,
         "DoShuffle": DoShuffle,
+        "Active": Active,
         "IsDef": IsDef,
         "IsMarked": IsMarked,
         "IsRight": IsRight,
@@ -338,8 +342,8 @@ class _TQuestionPreview extends State<TQuestionPreview> {
                 vertical: Dimens.padding_small,
               ),
               child: Center(
-                  child: Text(
-                      removeAllHtmlTags(orderList[index].Txt!) +
+                  child: Html(
+                      data: orderList[index].Txt! +
                           " (№" +
                           (index + 1).toString() +
                           ")")),
@@ -356,7 +360,7 @@ class _TQuestionPreview extends State<TQuestionPreview> {
   Widget Header() {
     return Column(children: <Widget>[
       (widget.question.Txt!.replaceAll("<p><br></p>", "").isNotEmpty)
-          ? Text(removeAllHtmlTags(widget.question.Txt!))
+          ? Html(data: widget.question.Txt!)
           : Container(),
       ((widget.question.Img!.isNotEmpty) &&
               (widget.question.IdType != CQTPicture))
@@ -417,7 +421,9 @@ class _TQuestionPreview extends State<TQuestionPreview> {
             }
           }
         }
-        return SingleChildScrollView(
+        return  Padding(
+            padding: const EdgeInsets.fromLTRB(0, 0, 20, 0),
+            child: SingleChildScrollView(
             controller: _scrollController,
             child: Column(children: <Widget>[
           Header(),
@@ -477,7 +483,7 @@ class _TQuestionPreview extends State<TQuestionPreview> {
                                         0.00, 15.00, 0.00, 0.00),
                                     child: Align(
                                         alignment: Alignment.centerLeft,
-                                        child: Text(removeAllHtmlTags(e.Txt!))))
+                                        child: Html(data: e.Txt!)))
                                 : Container(),
                             (e.Img!.isNotEmpty)
                                 ? Container(
@@ -494,7 +500,7 @@ class _TQuestionPreview extends State<TQuestionPreview> {
                 .toList(),
           ),
           Footer(),
-        ]));
+        ])));
       case CQTInputField:
         var ans_ = "";
         if (widget.showAnswer) {
@@ -555,9 +561,9 @@ class _TQuestionPreview extends State<TQuestionPreview> {
                                               0.00, 15.00, 0.00, 0.00),
                                           child: Align(
                                               alignment: Alignment.centerLeft,
-                                              child: Text(
-                                                removeAllHtmlTags(e.Txt!),
-                                              )))
+                                              child: Html(
+                                                data: e.Txt!),
+                                              ))
                                       : Container(),
                                   (e.Img!.isNotEmpty)
                                       ? Container(
@@ -590,7 +596,7 @@ class _TQuestionPreview extends State<TQuestionPreview> {
                                     items: widget.question.vars
                                         ?.map((v) => DropdownMenuItem(
                                             child:
-                                                Text(removeAllHtmlTags(v.Txt!)),
+                                                Html(data: v.Txt!),
                                             value: v.Id))
                                         .toList())),
                           ),

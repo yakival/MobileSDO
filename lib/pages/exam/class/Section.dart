@@ -5,7 +5,7 @@ class TSection {
   String? IdTest;
   String? Name;
   int? PresentQuestions;
-  String? DoShuffle;
+  bool? DoShuffle;
   int? Ord;
   bool? qbal;
   bool? qnum;

@@ -107,7 +107,7 @@ class _SyncCoursesState extends State<SyncCourses> {
         var res = await getCourseGuid(itm["guid"]!);
         itm["checked"] = (res == null) ? false : true;
         if (itm["checked"]) itm["id"] = res.id;
-        itm["description"] = "КУРС";
+        //itm["description"] = "КУРС";
         itm["cmode"] = null;
         _list.add(itm);
       }
@@ -246,20 +246,15 @@ class _SyncCoursesState extends State<SyncCourses> {
             itm_.name = itm["name"];
             itm_.description = itm["description"];
             itm_.path = itm["path"];
-            if ((itm["type"] == "test") || (itm["type"] == "SCORM")) {
-              itm_.description = itm["description"];
-            }
             if ((itm["type"] != "SCORM") &&
                 (itm["type"] != "test") &&
                 (itm["type"] != "html") &&
                 (itm["type"] != "CMP")) {
-              itm_.description = itm["description"];
               itm_.menu = itm["menu"];
             }
             if ((itm["type"] == "WRITING")) {
               itm_.name = itm["name"];
               itm_.jsondata = itm["jsondata"];
-              itm_.description = itm["description"];
               itm_.attempt = itm["attempt"];
               if (itm_.attempt == "null") {
                 if (itm_.name!.contains("%failed%")) {
@@ -276,13 +271,14 @@ class _SyncCoursesState extends State<SyncCourses> {
                     '{"id":"' +
                         itm_.guid! +
                         '", "type":"RATEBOOK", "idlog": null, "data":' +
-                        (itm_.time! - itm["time"]).toString() +
+                        (itm_.time! - (itm["time"] ?? 0)).toString() +
                         '}',
                     context);
               } else {
                 itm_.time = itm["time"];
               }
             }
+            itm_.rate = itm["rate"];
             itm_.links = itm["links"];
             itm_.access = itm["access"];
             itm_.history = itm["history"];

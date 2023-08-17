@@ -1,0 +1,3 @@
+flutter downgrade v2.8.1
+
+flutter build apk --no-sound-null-safety

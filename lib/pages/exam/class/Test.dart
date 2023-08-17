@@ -3,6 +3,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_html/flutter_html.dart';
 import 'package:myapp/pages/exam/class/Access.dart';
 import 'package:myapp/pages/exam/class/Question.dart';
 import 'package:myapp/pages/exam/class/Section.dart';
@@ -17,6 +18,7 @@ class TTest {
   String? IdType;
   String? Type;
   int? TimeToTest;
+  int? TimeRunTest;
   int? iQTime;
   bool? isFwdOnly;
   bool? DoShuffle;
@@ -40,6 +42,7 @@ class TTest {
       this.IdType,
       this.Type,
       this.TimeToTest,
+      this.TimeRunTest,
       this.iQTime,
       this.isFwdOnly,
       this.DoShuffle,
@@ -63,6 +66,7 @@ class TTest {
         IdType: json["IdType"],
         Type: json["type"],
         TimeToTest: json["TimeToTest"],
+        TimeRunTest: json["TimeRunTest"],
         iQTime: json["iQTime"],
         isFwdOnly: json["isFwdOnly"],
         DoShuffle: json["DoShuffle"],
@@ -92,6 +96,7 @@ class TTest {
         "IdType": IdType,
         "type": Type,
         "TimeToTest": TimeToTest,
+        "TimeRunTest": TimeRunTest,
         "iQTime": iQTime,
         "isFwdOnly": isFwdOnly,
         "DoShuffle": DoShuffle,
@@ -159,54 +164,6 @@ class TestPreview extends StatelessWidget {
                 ),
               ],
             ),
-            /*
-            TableRow(
-              children: <Widget>[
-                const TableCell(
-                  child: Text(
-                    "Время на тест",
-                    style: TextStyle(
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
-                Container(),
-                TableCell(
-                  child: Text(
-                    (test.TimeToTest! > 0)
-                        ? test.TimeToTest.toString() + " минут"
-                        : "не ограничено",
-                    style: const TextStyle(
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            TableRow(
-              children: <Widget>[
-                const TableCell(
-                  child: Text(
-                    "Время на вопрос",
-                    style: TextStyle(
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
-                Container(),
-                TableCell(
-                  child: Text(
-                    (test.iQTime! > 0)
-                        ? test.iQTime.toString() + " секунд"
-                        : "не ограничено",
-                    style: const TextStyle(
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            */
             TableRow(
               children: <Widget>[
                 const TableCell(
@@ -248,12 +205,13 @@ class QuestionList extends StatelessWidget {
     required this.test,
     required this.dir,
     required this.onSelect,
+    required this.list_,
   }) : super(key: key);
 
   final String dir;
   final TTest test;
   final ValueChanged<TQuestion?> onSelect;
-  List<TQuestion> list_ = [];
+  final List<TQuestion> list_;
 
   void _handleTap(value) {
     onSelect(value);
@@ -280,7 +238,7 @@ class QuestionList extends StatelessWidget {
 
   DataTable _createDataTable(BuildContext context) {
     return DataTable(
-        columnSpacing: 5.00,
+        columnSpacing: 3.00,
         dataRowHeight: kMinInteractiveDimension * 1.6,
         columns: _createColumns(),
         rows: _createRows(context));
@@ -304,10 +262,10 @@ class QuestionList extends StatelessWidget {
   }
 
   List<DataRow> _createRows(BuildContext context) {
-    list_ = [];
-    for (TSection sec in test.sections!) {
-      list_ = [...list_, ...sec.questions!];
-    }
+    //list_ = [];
+    //for (TSection sec in test.sections!) {
+    //  list_ = [...list_, ...sec.questions!];
+    //}
     int i = 0;
     return list_.map((book) {
       i++;
@@ -325,13 +283,13 @@ class QuestionList extends StatelessWidget {
                         File('$dir/${book.Img}'),
                         width: 100.00,
                       )
-                    : Text(removeAllHtmlTags(book.Txt!))),
+                    : Html(data: book.Txt!)),
             onTap: () {
               _handleTap(book);
             },
           ),
           DataCell(Container(
-              width: 50, //SET width
+              width: 60, //SET width
               child: (!(book.IsMarked ?? false))
                   ? IconButton(
                       icon: Icon(Icons.warning_amber_outlined,

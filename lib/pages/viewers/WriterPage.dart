@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:html_editor_enhanced/html_editor.dart';
@@ -31,16 +33,22 @@ class _WriterPageState extends State<WriterPage> {
   getName(Item itm) {
     String nm = itm.name ?? "";
     if (itm.type == "WRITING") {
-      nm = nm.replaceAll("%oncheck%", " [на проверке]");
-      nm = nm.replaceAll("%failed%", " [возврат]");
-      nm = nm.replaceAll("%passed%", " [проверено]");
+      String descr = itm.description ?? "{}";
+      String status = jsonDecode(descr)["status"];
+      if(status != "") {
+        nm += (status == "oncheck")?" [на проверке]":"";
+        nm += (status == "oncheck2")?" [на повторной проверке]":"";
+        nm += (status == "failed")?" [возврат]":"";
+        nm += (status == "passed2")?" [проверено повторно]":"";
+        nm += (status == "passed")?" [проверено]":"";
+      }
     }
     return nm;
   }
 
   getEdit(Item item) {
-    if ((item.name!.contains("%passed%")) ||
-        (item.name!.contains("%oncheck%"))) {
+    if ((item.description!.contains("passed")) ||
+        (item.description!.contains("oncheck"))) {
       return false;
     } else {
       return true;
@@ -67,7 +75,7 @@ class _WriterPageState extends State<WriterPage> {
           controller: controller, //required
           htmlEditorOptions: const HtmlEditorOptions(
             autoAdjustHeight: true,
-            initialText: "text content initial, if any",
+            initialText: "",
           ),
           otherOptions: const OtherOptions(),
         ),
@@ -94,7 +102,7 @@ class _WriterPageState extends State<WriterPage> {
                   onPressed: () async {
                     _args.jsondata = await controller.getText();
                     await updateItem(_args);
-                    if (args.name!.contains("%oncheck%")) {
+                    if (args.description!.contains("oncheck")) {
                       return;
                     }
                     var isOnline = await hasNetwork(context);
@@ -133,20 +141,29 @@ class _WriterPageState extends State<WriterPage> {
                             ],
                           );
                         });
+                    Course val = await getCourse(args.courseid!) as Course;
+                    var data = jsonDecode(args.description!);
+                    data["status"] = (data["status"] == "failed")?"oncheck2":"oncheck";
                     await httpAPI(
                         "close/students/sync.asp",
                         '{"id":"' +
                             args.guid! +
+                            '", "orderid":"' +
+                            val.orderid! +
+                            '", "status":"' +
+                            data["status"] +
                             '", "type":"WRITING~1", "data":"' +
                             args.jsondata!.replaceAll('"', "&quot;") +
                             '"}',
                         context);
                     await httpAPIMultipart(
                         "close/students/sync.asp",
-                        '{"id":"' + args.guid! + '", "type":"WRITING~2"}',
+                        '{"id":"' + args.guid! + '", "orderid":"' +
+                            val.orderid! +
+                            '", "type":"WRITING~2"}',
                         fpath,
                         context);
-                    args.name = args.name!.split(" %")[0] + " %oncheck%";
+                    args.description = jsonEncode(data);
                     args.sync = false;
                     await updateItem(args);
                     //setState(() {});

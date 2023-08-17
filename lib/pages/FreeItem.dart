@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:archive/archive_io.dart';
 import 'package:badges/badges.dart' as badge;
 import 'package:disk_space/disk_space.dart';
 import 'package:flutter/material.dart';
@@ -123,6 +124,7 @@ class _FreePageState extends State<FreePage> {
 
     if (itm.type == "WRITING") {
       Archive archive;
+      /*
       var bytes = await File(itm.localpath!).readAsBytes();
       ByteData data = bytes.buffer.asByteData();
       List<int> content =
@@ -131,6 +133,11 @@ class _FreePageState extends State<FreePage> {
         content[i] = data.getUint8(i);
       }
       archive = ZipDecoder().decodeBytes(content);
+       */
+
+      final inputStream = InputFileStream(itm.localpath!);
+      archive = ZipDecoder().decodeBuffer(inputStream);
+
       for (ArchiveFile file_ in archive) {
         if (file_.isFile) {
           List<int> data = file_.content;

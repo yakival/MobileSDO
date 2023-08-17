@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:archive/archive_io.dart';
 import 'package:disk_space/disk_space.dart';
 import 'package:flutter/material.dart';
 import 'package:myapp/database/Database.dart';
@@ -428,6 +429,7 @@ class _HomePageState extends State<HomePage> {
 
     if (itm.type == "WRITING") {
       Archive archive;
+      /*
       var bytes = await File(itm.localpath!).readAsBytes();
       ByteData data = bytes.buffer.asByteData();
       List<int> content =
@@ -437,6 +439,11 @@ class _HomePageState extends State<HomePage> {
         content[i] = data.getUint8(i);
       }
       archive = ZipDecoder().decodeBytes(content);
+       */
+
+      final inputStream = InputFileStream(itm.localpath!);
+      archive = ZipDecoder().decodeBuffer(inputStream);
+
       for (ArchiveFile file_ in archive) {
         Uint8List bytesfn = Uint8List.fromList(file_.name.codeUnits);
         StringBuffer htmlBuffer = StringBuffer();
@@ -809,19 +816,23 @@ class _HomePageState extends State<HomePage> {
                                       mainAxisAlignment: MainAxisAlignment.end,
                                       children: <Widget>[
                                         Expanded(
+                                          flex: 7,
                                           child:
                                           LinearProgressIndicator(
                                             backgroundColor: Colors.black12,
-                                            color: (item.rate! == 100)?Colors.green:Colors.red,
+                                            color: (item.description! == "100")?Colors.green:Colors.red,
                                             value: item.rate! / 100,
                                           ),
                                         ),
+                                  Expanded(
+                                      flex: 3,
+                                      child:
                                         Align(
                                           alignment: Alignment.centerRight,
                                           child: Text('  ${item.rate.toString()}%',
                                             style: const TextStyle(color: Colors.blueGrey),
                                           ),
-                                        ),
+                                        )),
                                       ]),
                                   leading: null,
                                   onTap: () {
@@ -963,6 +974,7 @@ class _HomePageState extends State<HomePage> {
                                       mainAxisAlignment: MainAxisAlignment.end,
                                       children: <Widget>[
                                         Expanded(
+                                          flex: 7,
                                           child:
                                           LinearProgressIndicator(
                                             backgroundColor: Colors.black12,
@@ -970,12 +982,15 @@ class _HomePageState extends State<HomePage> {
                                             value: item.rate! / 100,
                                           ),
                                         ),
+                              Expanded(
+                                  flex: 3,
+                                  child:
                                         Align(
                                           alignment: Alignment.centerRight,
                                           child: Text('  ${item.rate.toString()}%',
                                             style: const TextStyle(color: Colors.blueGrey),
                                           ),
-                                        ),
+                                        )),
                                       ]),
                                   trailing: FittedBox(
                                       fit: BoxFit.fill,

@@ -22,10 +22,17 @@ class _WriterItemPageState extends State<WriterItemPage> {
   List<Item> list_ = [];
   Item _args = Item();
   Map<String, dynamic> descr = {};
+  ScrollController? _scrollController;
 
   @override
   void initState() {
     super.initState();
+  }
+
+  @override
+  void dispose() {
+    //_scrollController.dispose();
+    super.dispose();
   }
 
   Future<List<Item>> getItems(Item param) async {
@@ -67,16 +74,22 @@ class _WriterItemPageState extends State<WriterItemPage> {
   getName(Item itm) {
     String nm = itm.name ?? "";
     if (itm.type == "WRITING") {
-      nm = nm.replaceAll("%oncheck%", " [на проверке]");
-      nm = nm.replaceAll("%failed%", " [возврат]");
-      nm = nm.replaceAll("%passed%", " [проверено]");
+      String descr = itm.description ?? "{}";
+      String status = jsonDecode(descr)["status"];
+      if(status != "") {
+        nm += (status == "oncheck")?" [на проверке]":"";
+        nm += (status == "oncheck2")?" [на повторной проверке]":"";
+        nm += (status == "failed")?" [возврат]":"";
+        nm += (status == "passed2")?" [проверено повторно]":"";
+        nm += (status == "passed")?" [проверено]":"";
+      }
     }
     return nm;
   }
 
   getEdit(Item item) {
-    if ((item.name!.contains("%passed%")) ||
-        (item.name!.contains("%oncheck%"))) {
+    if ((item.description!.contains("passed")) ||
+        (item.description!.contains("oncheck"))) {
       return false;
     } else {
       return true;
@@ -95,7 +108,9 @@ class _WriterItemPageState extends State<WriterItemPage> {
         appBar: AppBar(
           title: Text(getName(args)),
         ),
-        body: Column(
+        body: Center(
+    //child: SingleChildScrollView(
+    child: Column(
             children: <Widget>[
         Padding(
         padding: const EdgeInsets.fromLTRB(
@@ -103,9 +118,11 @@ class _WriterItemPageState extends State<WriterItemPage> {
         child: Row(
             children: <Widget>[
               const Expanded(
+                flex: 1,
                 child: Text('Описание:', textAlign: TextAlign.left),
               ),
               Expanded(
+                flex: 3,
                 child: Html(data: descr["descr"]),
               ),
             ],
@@ -212,7 +229,7 @@ class _WriterItemPageState extends State<WriterItemPage> {
               }
             }),
     )
-        ]),
+        ])),
         bottomNavigationBar:
             Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           ElevatedButton(

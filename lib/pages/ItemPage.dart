@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:archive/archive_io.dart';
 import 'package:badges/badges.dart' as badge;
 import 'package:disk_space/disk_space.dart';
 import 'package:flutter/material.dart';
@@ -392,6 +393,7 @@ class _ItemPageState extends State<ItemPage> {
 
     if (itm.type == "WRITING") {
       Archive archive;
+      /*
       var bytes = await File(itm.localpath!).readAsBytes();
       ByteData data = bytes.buffer.asByteData();
       List<int> content =
@@ -401,6 +403,11 @@ class _ItemPageState extends State<ItemPage> {
         content[i] = data.getUint8(i);
       }
       archive = ZipDecoder().decodeBytes(content);
+       */
+
+      final inputStream = InputFileStream(itm.localpath!);
+      archive = ZipDecoder().decodeBuffer(inputStream);
+
       for (ArchiveFile file_ in archive) {
         Uint8List bytesfn = Uint8List.fromList(file_.name.codeUnits);
         StringBuffer htmlBuffer = StringBuffer();
@@ -531,6 +538,7 @@ class _ItemPageState extends State<ItemPage> {
   getName(Item itm) {
     String nm = itm.name ?? "";
     if (itm.type == "WRITING") {
+      nm = nm.replaceAll("%oncheck2%", " [на повторной проверке]");
       nm = nm.replaceAll("%oncheck%", " [на проверке]");
       nm = nm.replaceAll("%failed%", " [возврат]");
       nm = nm.replaceAll("%passed%", " [проверено]");
@@ -539,14 +547,18 @@ class _ItemPageState extends State<ItemPage> {
   }
 
   getStatusString(Item itm) {
-    String nm = itm.jsondata ?? "";
+    String nm = itm.description ?? "{}";
+    String status = "";
     if (itm.type == "WRITING") {
-      nm = nm.replaceAll("oncheck", "На проверке");
-      nm = nm.replaceAll("failed", "Возврат");
-      nm = nm.replaceAll("passed", "Проверено");
-      nm = nm.replaceAll("null", "");
+      status = jsonDecode(nm)["status"] ?? "";
+      status = status.replaceAll("oncheck2", "На повторной проверке");
+      status = status.replaceAll("oncheck", "На проверке");
+      status = status.replaceAll("failed", "Возврат");
+      status = status.replaceAll("passed2", "Проверено повторно");
+      status = status.replaceAll("passed", "Проверено");
+      status = status.replaceAll("null", "");
     }
-    return nm;
+    return status;
   }
 
   Future<bool> getLinks(Item itm) async {
@@ -556,8 +568,22 @@ class _ItemPageState extends State<ItemPage> {
       var arr = itm.links!.split(",");
       for (var el in arr) {
         Item rec = await getItemGuid(el);
-        if ((rec.time ?? 0) < (rec.rate ?? 0)) {
-          ret.add(rec);
+
+        if (rec.type == "test") {
+          var arr = rec.description!.split("/");
+          var val = 0;
+          if (arr.length > 1) {
+            if (arr[1] != "") {
+              val = int.parse(arr[1]);
+            }
+          }
+          if (val < rec.rate!) {
+            ret.add(rec);
+          }
+        } else {
+          if ((rec.time ?? 0) < (rec.rate ?? 0)) {
+            ret.add(rec);
+          }
         }
       }
       if (ret.isNotEmpty) {
@@ -625,22 +651,34 @@ class _ItemPageState extends State<ItemPage> {
     }
   }
 
-  double getTestPr(Item item) {
-    var arr = item.description!.split("/");
+  double getTestPr(String descr) {
+    var arr = (descr ?? "").split("/");
 
     var ret = 0.0;
     if(arr.length > 1){
       if(arr[1] != ""){
-        return double.parse(arr[1]);
+        return (double.parse(arr[1]) == -1)?0:double.parse(arr[1]);
       }
     }
     return ret;
   }
 
-  String getTestCr(Item item) {
+  MaterialColor getTestColor(String descr) {
+    var arr = (descr ?? "").split("/");
+
+    var ret = Colors.blue;
+    if(arr.length > 1){
+      if(arr[2] == "1"){
+        ret = Colors.green;
+      }
+    }
+    return ret;
+  }
+
+  String getTestCr(String descr) {
     var ret = "";
 
-    var arr = item.description!.split("/");
+    var arr = (descr ?? "").split("/");
     if(arr.length > 1){
       if(arr[5] != ""){
         ret = '<span style="color: ${arr[6]}">${arr[5]}</span>';
@@ -708,10 +746,10 @@ class _ItemPageState extends State<ItemPage> {
               //Item item = snapshot.data![index];
               GroupedListView<Item, String>(
                   elements: snapshot.data!,
-                  groupBy: (element) => element.modulename!,
+                  groupBy: (element) => (element.modulename ?? ""),
                   groupComparator: (value1, value2) => value2.compareTo(value1),
                   itemComparator: (item1, item2) =>
-                      item1.modulename!.compareTo(item2.modulename!),
+                      (item1.modulename ?? "").compareTo((item2.modulename ?? "")),
                   order: GroupedListOrder.DESC,
                   useStickyGroupSeparators: true,
                   groupSeparatorBuilder: (String value) => Padding(
@@ -729,12 +767,86 @@ class _ItemPageState extends State<ItemPage> {
                     return Card(
                       child: ListTile(
                         //isThreeLine: true,
-                        title: Text(
-                          getName(item),
-                          style: TextStyle(
-                              color: (item.load ?? false)
-                                  ? Colors.black
-                                  : Colors.grey),
+                        title: Row(
+                          //textDirection: TextDirection.RTL,
+                          children: <Widget>[
+                            Expanded(
+                              child: Text(
+                                getName(item),
+                                style: TextStyle(
+                                    color: (item.load ?? false)
+                                        ? Colors.black
+                                        : Colors.grey),
+                              )
+                            ),
+                            (item.type == "WRITING" && jsonDecode(item.description ?? '{"comment": ""}')["comment"] != "")?
+                            IconButton(
+                              icon: const Icon(
+                                Icons.comment,
+                                color: Colors.blue,
+                              ),
+                              onPressed: () async {
+                                showDialog(
+                                    context: context,
+                                    builder: (BuildContext context) {
+                                      return AlertDialog(
+                                        title: Container(
+                                            decoration: const BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  colors: [Color(0xff4B4F96), Color(0xff78B1CF)],
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                )
+                                            ),
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(8.0),
+                                              child: Text('${item.name!}',style: const TextStyle(color: Colors.white),),
+                                            )
+                                        ),
+                                        content: writingComment(context, item),
+                                      );
+                                    }
+                                ).then((value) {
+                                  setState(() {});
+                                });
+                              },
+                            ):
+                            (item.type == "test" && (item.history ?? "[]") != "[]")?
+                            IconButton(
+                              icon: const Icon(
+                                Icons.history,
+                                color: Colors.blue,
+                              ),
+                              onPressed: () async {
+                                history = jsonDecode(item.history!);
+                                showDialog(
+                                    context: context,
+                                    builder: (BuildContext context) {
+                                      return AlertDialog(
+                                        title: Container(
+                                            decoration: const BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  colors: [Color(0xff4B4F96), Color(0xff78B1CF)],
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                )
+                                            ),
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(8.0),
+                                              child: Text('${item.name!}',style: const TextStyle(color: Colors.white),),
+                                            )
+                                        ),
+                                        content: historySelect(context, item),
+                                      );
+                                    }
+                                ).then((value) {
+                                  setState(() {});
+                                });
+                              },
+                            )
+                                :Container()
+                            ,
+                          ],
                         ),
                         subtitle: Column(children: [
                           ((item.type != "test") &&
@@ -743,6 +855,7 @@ class _ItemPageState extends State<ItemPage> {
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: <Widget>[
                                 Expanded(
+                                  flex: 8,
                                   child:
                                   LinearProgressIndicator(
                                     backgroundColor: Colors.black12,
@@ -750,18 +863,22 @@ class _ItemPageState extends State<ItemPage> {
                                     value: getRateBookPr(item) / 100,
                                   ),
                                 ),
+                                Expanded(
+                                    flex: 2,
+                                    child:
                                 Align(
                                   alignment: Alignment.centerRight,
                                   child: Text('  ${getRateBookPr(item).round()}%',
                                     style: const TextStyle(color: Colors.blueGrey),
                                   ),
-                                ),
+                                )),
                               ]):
                           (item.type == "SCORM")?
                           Row(
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: <Widget>[
                                 Expanded(
+                                  flex: 8,
                                   child:
                                   LinearProgressIndicator(
                                     backgroundColor: Colors.black12,
@@ -769,12 +886,14 @@ class _ItemPageState extends State<ItemPage> {
                                     value: (item.rate ?? 0) / 100,
                                   ),
                                 ),
-                                Align(
+                                Expanded(
+                                    flex: 2,
+                                    child:                                Align(
                                   alignment: Alignment.centerRight,
                                   child: Text('  ${item.rate ?? 0}%',
                                     style: const TextStyle(color: Colors.blueGrey),
                                   ),
-                                ),
+                                )),
                               ]):
 
                           (item.type == "test")?
@@ -784,25 +903,29 @@ class _ItemPageState extends State<ItemPage> {
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: <Widget>[
                                 Expanded(
+                                  flex: 8,
                                   child:
                                   LinearProgressIndicator(
                                     backgroundColor: Colors.black12,
-                                    color: (getTestPr(item) == 100)?Colors.green:Colors.red,
-                                    value: getTestPr(item) / 100,
+                                    color: getTestColor(item.description!),
+                                    value: getTestPr(item.description!) / 100,
                                   ),
                                 ),
+                                Expanded(
+                                    flex: 2,
+                                    child:
                                 Align(
                                   alignment: Alignment.centerRight,
-                                  child: Text('  ${getTestPr(item).round()}%',
+                                  child: Text('  ${getTestPr(item.description!).round()}%',
                                     style: const TextStyle(color: Colors.blueGrey),
                                   ),
-                                ),
+                                )),
                               ]),
                                   RichText(
                                       text: HTML.toTextSpan(
                                           context,
                                           '<div style="width: 100%, text-align: left; font-size: 12px;">' +
-                                          getTestCr(item) +
+                                          getTestCr(item.description!) +
                                           "</div>")),
                               ]):
 
@@ -811,17 +934,21 @@ class _ItemPageState extends State<ItemPage> {
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: <Widget>[
                                 Expanded(
+                                  flex: 8,
                                   child:
                                   Text(getStatusString(item),
                                     style: const TextStyle(color: Colors.blueGrey),
                                   ),
                                 ),
+                                Expanded(
+                                    flex: 2,
+                                    child:
                                 Align(
                                   alignment: Alignment.centerRight,
                                   child: Text((item.attempt != null)?'  ${item.attempt}':"",
                                     style: const TextStyle(color: Colors.blueGrey),
                                   ),
-                                ),
+                                )),
                               ]):
                           RichText(
                               text: HTML.toTextSpan(
@@ -844,7 +971,8 @@ class _ItemPageState extends State<ItemPage> {
                         //(item.dtend != null)
                         //    ? Text(GlobalData.getDateString(item.dtend!))
                         //    : null,
-                        leading: (item.type == 'pdf')
+                        leading: (!((item.type == 'SCORM') || (item.type == 'test') || (item.type == 'WRITING')))?
+                        (item.type == 'pdf')
                             ? const Padding(
                             padding: EdgeInsets.fromLTRB(10.0, 0.0, 0.0, 0.0),
                             child: Icon(
@@ -878,15 +1006,7 @@ class _ItemPageState extends State<ItemPage> {
                               Icons.web_outlined,
                               color: Colors.blue,
                             ))
-                            : (item.type == 'doc' ||
-                            item.type == 'docx' ||
-                            item.type == 'xls' ||
-                            item.type == 'xlsx' ||
-                            item.type == 'ppt' ||
-                            item.type == 'pptx' ||
-                            item.type == 'rar'
-                        )
-                            ? const Padding(
+                            : const Padding(
                             padding: EdgeInsets.fromLTRB(
                                 10.0, 0.0, 0.0, 0.0),
                             child: Icon(
@@ -1034,7 +1154,7 @@ class _ItemPageState extends State<ItemPage> {
                                       ])])):
 
                         (item.type == 'test')?
-                        (item.load!)
+                        (item.load! && (!item.jsondata!.contains('"IdType":"t"')))
                             ? (item.sync!)
                             ? FittedBox(
                             fit: BoxFit.fill,
@@ -1075,13 +1195,13 @@ class _ItemPageState extends State<ItemPage> {
                                             var json =
                                             jsonDecode(item
                                                 .jsondata!);
-                                            for (var sec in json[
-                                            "sections"]) {
-                                              for (var q in sec[
-                                              "questions"]) {
-                                                q["Txt"] = "";
-                                              }
-                                            }
+                                            //for (var sec in json[
+                                            //"sections"]) {
+                                            //  for (var q in sec[
+                                            //  "questions"]) {
+                                            //    q["Txt"] = "";
+                                            //  }
+                                            //}
                                             var res = await httpAPI(
                                                 "close/students/sync.asp",
                                                 '{"id": "${item.guid}", "course": "${args.guid}", "type": "TEST", "data": ' +
@@ -1092,7 +1212,7 @@ class _ItemPageState extends State<ItemPage> {
                                                 String,
                                                 dynamic>;
                                             item.description = res["description"];
-                                            item.history = res["history"];
+                                            item.history = null;
                                             if(res["history"] != null){
                                               item.history = jsonEncode(res["history"]);
                                             }
@@ -1201,9 +1321,9 @@ class _ItemPageState extends State<ItemPage> {
                             onPressed:
                                 () async {
                               if (item
-                                  .name!
+                                  .description!
                                   .contains(
-                                  "%oncheck%")) {
+                                  "oncheck")) {
                                 return;
                               }
                               var isOnline =
@@ -1258,27 +1378,29 @@ class _ItemPageState extends State<ItemPage> {
                                       ],
                                     );
                                   });
+                              Course val = await getCourse(item.courseid!) as Course;
+                              var data = jsonDecode(args.description!);
+                              data["status"] = (data["status"] == "failed")?"oncheck2":"oncheck";
                               await httpAPI(
                                   "close/students/sync.asp",
                                   '{"id":"' +
-                                      item
-                                          .guid! +
+                                      item.guid! +
+                                      '", "orderid":"' +
+                                      val.orderid! +
+                                      '", "status":"' +
+                                      data["status"] +
                                       '", "type":"WRITING~1", "data":"' +
-                                      item.jsondata!.replaceAll('"',
-                                          "&quot;") +
+                                      item.jsondata!.replaceAll('"', "&quot;") +
                                       '"}',
                                   context);
                               await httpAPIMultipart(
                                   "close/students/sync.asp",
-                                  '{"id":"' +
-                                      item.guid! +
+                                  '{"id":"' + item.guid! + '", "orderid":"' +
+                                      val.orderid! +
                                       '", "type":"WRITING~2"}',
                                   fpath,
                                   context);
-                              item.name = item
-                                  .name!
-                                  .split(" %")[0] +
-                                  " %oncheck%";
+                              item.description = jsonEncode(data);
                               item.sync =
                               false;
                               await updateItem(
@@ -1330,39 +1452,7 @@ class _ItemPageState extends State<ItemPage> {
                             fit: BoxFit.fill,
                             child: Row(
                               children: <Widget>[
-                                (item.type == "test" && (item.history ?? "[]") != "[]")?
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.history,
-                                    color: Colors.blue,
-                                  ),
-                                  onPressed: () async {
-                                    history = jsonDecode(item.history!);
-                                    showDialog(
-                                        context: context,
-                                        builder: (BuildContext context) {
-                                          return AlertDialog(
-                                            title: Container(
-                                                decoration: const BoxDecoration(
-                                                    gradient: LinearGradient(
-                                                      colors: [Color(0xff4B4F96), Color(0xff78B1CF)],
-                                                      begin: Alignment.topLeft,
-                                                      end: Alignment.bottomRight,
-                                                    )
-                                                ),
-                                                child: Padding(
-                                                  padding: const EdgeInsets.all(8.0),
-                                                  child: Text('${item.name!}',style: const TextStyle(color: Colors.white),),
-                                                )
-                                            ),
-                                            content: historySelect(context, item),
-                                          );
-                                        }
-                                    ).then((value) {
-                                      setState(() {});
-                                    });
-                                  },
-                                ):Container(),
+
                                 (_total == 1)
                                     ? ((item.load ?? false)
                                     ? IconButton(
@@ -1498,11 +1588,13 @@ class _ItemPageState extends State<ItemPage> {
                               for (TSection sec in test.sections!) {
                                 for (TQuestion q in sec.questions!) {
                                   q.IsMarked = null;
+                                  q.Active = null;
                                   for (TAnswer ans in q.answers!) {
                                     ans.answer = null;
                                   }
                                 }
                               }
+                              item.time = 0;
                               item.jsondata = jsonEncode(test.toMap());
                               await updateItem(item);
                             }
@@ -1578,13 +1670,13 @@ class _ItemPageState extends State<ItemPage> {
                                     child:
                                     LinearProgressIndicator(
                                       backgroundColor: Colors.black12,
-                                      color: (getTestPr(itm) == 100)?Colors.green:Colors.red,
-                                      value: getTestPr(itm) / 100,
+                                      color: (getTestPr(itemf["description"]) == 100)?Colors.green:Colors.red,
+                                      value: getTestPr(itemf["description"]) / 100,
                                     ),
                                   ),
                                   Align(
                                     alignment: Alignment.centerRight,
-                                    child: Text('  ${getTestPr(itm).round()}%',
+                                    child: Text('  ${getTestPr(itemf["description"]).round()}%',
                                       style: const TextStyle(color: Colors.blueGrey),
                                     ),
                                   ),
@@ -1593,7 +1685,7 @@ class _ItemPageState extends State<ItemPage> {
                                 text: HTML.toTextSpan(
                                     context,
                                     '<div style="width: 100%, text-align: left; font-size: 12px;">' +
-                                        getTestCr(itm) +
+                                        getTestCr(itemf["description"]) +
                                         "</div>")),
                           ]),
                       onTap: () async {
@@ -1601,6 +1693,30 @@ class _ItemPageState extends State<ItemPage> {
                   ));
             },
           ),
+        ),
+        Align(
+          alignment: Alignment.bottomRight,
+          child: TextButton(
+
+            onPressed: (){
+              Navigator.pop(context);
+            },child: Text("Назад"),),
+        )
+      ],
+    );
+  }
+
+  Widget writingComment(context, Item itm) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          height: 300.0, // Change as per your requirement
+          width: 300.0, // Change as per your requirement
+          child: SingleChildScrollView(
+              child: Column(children: <Widget>[
+                Html(data: jsonDecode(itm.description ?? "{}")["comment"]),
+              ])),
         ),
         Align(
           alignment: Alignment.bottomRight,

@@ -35,8 +35,13 @@ class _PhotoViewState extends State<PlayerPage> {
     var _result = await OpenFile.open(filePath);
     if (_result.message == "done") {
       isLoad = true;
+      if((_args.time ?? 0) == 0 && (_args.rate ?? 0) == 0) {
+        _args.time = (_args.time ?? 0) + 1;
+        await updateItem(_args);
+      }
       _timer = Timer.periodic(const Duration(minutes: 1), (Timer timer) async {
-        updateItem(_args);
+        _args.time = (_args.time ?? 0) + 1;
+        await updateItem(_args);
         setState(() {});
         var res = await httpAPI(
             "close/students/sync.asp",
@@ -45,7 +50,6 @@ class _PhotoViewState extends State<PlayerPage> {
             context);
         var json = res as Map<String, dynamic>;
         idlog = json["idlog"];
-        _args.time = (_args.time ?? 0) + 1;
       });
       setState(() {});
     }

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
+import 'package:archive/archive_io.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:myapp/database/ItemModel.dart';
@@ -41,13 +42,15 @@ class _TestPageState extends State<TestPage> {
   List<TQuestion> list_ = [];
   late ScrollController _scrollController;
   bool showAnswer = false;
+  Timer? _timer;
+
+  final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey =
+  GlobalKey<RefreshIndicatorState>();
 
   @override
   void initState() {
     _scrollController = ScrollController();
-
     super.initState();
-
     _startServer();
   }
 
@@ -55,14 +58,13 @@ class _TestPageState extends State<TestPage> {
   void dispose() {
     _cleanup();
     _scrollController.dispose();
+    if(_timer != null) {
+      _timer?.cancel();
+    }
     super.dispose();
   }
 
   bool getNoAnswer() {
-    list_ = [];
-    for (TSection sec in _args.sections!) {
-      list_ = [...list_, ...sec.questions!];
-    }
     for (TQuestion q in list_) {
       if (!(q.IsMarked ?? false)) {
         return (true);
@@ -72,10 +74,6 @@ class _TestPageState extends State<TestPage> {
   }
 
   TQuestion? getQuestion(TQuestion? value) {
-    list_ = [];
-    for (TSection sec in _args.sections!) {
-      list_ = [...list_, ...sec.questions!];
-    }
     bool fnd = (value == null) ? true : false;
     if ((list_.isNotEmpty) && (value == null)) {
       value = list_[0];
@@ -100,6 +98,58 @@ class _TestPageState extends State<TestPage> {
         duration: const Duration(milliseconds: 50), curve: Curves.linear);
   }
 
+  String showTime(diffTime) {
+    if (diffTime == null) {
+      return "";
+    }
+    var days = diffTime / (24*60);
+    var hours = (days % 1) * 24;
+    var minutes = (hours % 1) * 60;
+    var secs = (minutes % 1) * 60;
+    var ret_ = //((days ~/ 1 > 0) ? "${days ~/ 1} дн. " : "") +
+    ((hours ~/ 1 > 0) ? "${(hours ~/ 1 > 9)?"":"0"}${hours ~/ 1}:" : "00:") +
+        ((minutes ~/ 1 > 0) ? "${(minutes ~/ 1 > 9)?"":"0"}${minutes ~/ 1}" : "00");
+    if (ret_ == "") {
+      ret_ = "00:00";
+    }
+    return ret_;
+  }
+
+  void setTimer(Timer timer) async {
+    _argsItem.time = (_argsItem.time ?? 0) + 1;
+    await updateItem(_argsItem);
+    setState(() {});
+    if(_argsItem.time! >= _args.TimeToTest!){
+      await showDialog(
+          context:
+          context,
+          builder:
+              (BuildContext
+          context) {
+            return AlertDialog(
+              title:
+              const Text('Завершение теста'),
+              content:
+              const Text("Время, выделенное на выполнение теста истекло."),
+              actions: [
+                ElevatedButton(
+                    onPressed: () async {
+                      if(_args.IdType == "t") {
+                        _refreshIndicatorKey.currentState?.show();
+                      }else {
+                        _argsItem.jsondata = jsonEncode(_args.toMap());
+                        await updateItem(_argsItem);
+                        Navigator.of(context).pop();
+                      }
+                    },
+                    child: const Text('Завершить')),
+              ],
+            );
+          });
+      Navigator.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final args = ModalRoute.of(context)!.settings.arguments as List;
@@ -113,13 +163,24 @@ class _TestPageState extends State<TestPage> {
     return Scaffold(
         appBar: AppBar(
           title: Text(_args.Name! + ((showAnswer) ? " - ОТВЕТЫ" : "")),
+            actions: <Widget>[
+        Row(
+        children: <Widget>[
+        Padding(
+        padding: const EdgeInsets.fromLTRB(
+            0.0, 0.0, 5.0, 0.0),
+        child:
+            ((_args.TimeToTest ?? 0) > 0 )?Text(showTime((_args.TimeToTest ?? 0) - (_argsItem.time ?? 0))):Container()
         ),
+          ]),
+        ]),
         bottomNavigationBar: (_stackToView == 1)
             ? Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                 ElevatedButton(
                   onPressed: () async {
                     _argsItem.exec = true;
                     await updateItem(_argsItem);
+                    _timer = Timer.periodic(const Duration(minutes: 1), setTimer);
                     setState(() {
                       _scrollToTop();
                       _currQuestion = getQuestion(_currQuestion);
@@ -153,21 +214,33 @@ class _TestPageState extends State<TestPage> {
                             onPressed: () {
                               setState(() {
                                 _scrollToTop();
+
                                 _currQuestion = getQuestion(_currQuestion);
                                 (_currQuestion == null)
                                     ? _stackToView = 2
                                     : _stackToView = 3;
+
                               });
                             },
                             child: const Text('Ответить'),
                           )
                         : ElevatedButton(
                             onPressed: () async {
+                              if(_args.IdType == "t") {
+                                _refreshIndicatorKey.currentState?.show();
+                              }else {
+                                _argsItem.jsondata = jsonEncode(_args.toMap());
+                                await updateItem(_argsItem);
+                                Navigator.of(context).pop();
+                              }
+                              return;
+
                               var isOnline = await hasNetwork(context);
                               if (!isOnline) {
                                 return;
                               }
                               _argsItem.sync = true;
+                              _argsItem.jsondata = jsonEncode(_args.toMap());
                               await updateItem(_argsItem);
                               setState(() {});
                               var json = jsonDecode(_argsItem.jsondata!);
@@ -182,11 +255,17 @@ class _TestPageState extends State<TestPage> {
                                   '{"id": "${_argsItem.guid}", "course": "${c.guid}", "type": "TEST", "data": ' +
                                       jsonEncode(json) +
                                       '}',
-                                  context);
-                              _argsItem.description =
-                                  (res as Map<String, dynamic>)["description"];
+                                  context) as Map<
+                                  String,
+                                  dynamic>;
+                              _argsItem.description = res["description"];
+                              _argsItem.history = null;
+                              if(res["history"] != null){
+                                _argsItem.history = jsonEncode(res["history"]);
+                              }
                               _argsItem.sync = false;
-                              await updateItem(_argsItem);
+                              await updateItem(
+                                  _argsItem);
                               Navigator.of(context).pop();
                             },
                             child: const Text('Отправить'),
@@ -197,9 +276,13 @@ class _TestPageState extends State<TestPage> {
                     ),
                     ElevatedButton(
                       onPressed: () async {
-                        _argsItem.jsondata = jsonEncode(_args.toMap());
-                        await updateItem(_argsItem);
-                        Navigator.of(context).pop();
+                        if(_args.IdType == "t") {
+                          _refreshIndicatorKey.currentState?.show();
+                        }else {
+                          _argsItem.jsondata = jsonEncode(_args.toMap());
+                          await updateItem(_argsItem);
+                          Navigator.of(context).pop();
+                        }
                       },
                       child: const Text('Завершить'),
                     ),
@@ -280,14 +363,19 @@ class _TestPageState extends State<TestPage> {
                                       }
                                     }
                                     if (mark) {
-                                      setState(() {
-                                        _scrollToTop();
-                                        _currQuestion?.IsMarked = mark;
-                                        _currQuestion =
-                                            getQuestion(_currQuestion);
+                                      _scrollToTop();
+                                      _currQuestion?.IsMarked = mark;
+
+                                      //if(_args.IdType == "t") {
+                                      //  _refreshIndicatorKey.currentState?.show();
+                                      //}else {
+                                        _currQuestion = getQuestion(_currQuestion);
                                         (_currQuestion == null)
                                             ? _stackToView = 2
                                             : _stackToView = 3;
+                                      //}
+
+                                      setState(() {
                                       });
                                     }
                                   },
@@ -328,7 +416,31 @@ class _TestPageState extends State<TestPage> {
                                 ),
                               ])
                     : null,
-        body: Padding(
+        body: RefreshIndicator(
+    key: _refreshIndicatorKey,
+    color: Colors.white,
+    backgroundColor: Colors.blue,
+    strokeWidth: 4.0,
+    onRefresh: () async {
+    // Replace this delay with the code to be executed during refresh
+    // and return a Future when code finishes execution.
+    //return Future<void>.delayed(const Duration(seconds: 3));
+
+      var isOnline = await hasNetwork(context);
+      if (!isOnline) {
+        return;
+      }
+
+      if(_stackToView == 3) {
+        await putTest(_argsItem);
+      }
+      if(_stackToView == 2) {
+        await syncTest(_argsItem);
+      }
+
+    },
+    // Pull from top to show refresh indicator.
+    child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: IndexedStack(
                   index: _stackToView,
@@ -361,6 +473,7 @@ class _TestPageState extends State<TestPage> {
                             controller: _scrollController,
                             child: QuestionList(
                       test: _args,
+                      list_: list_,
                       dir: testDirectory!.path.toString(),
                       onSelect: (value) {
                         if (value == null) {
@@ -397,7 +510,7 @@ class _TestPageState extends State<TestPage> {
                               )
                             : null),
                   ],
-                )));
+                ))));
   }
 
   Future _startServer() async {
@@ -409,6 +522,7 @@ class _TestPageState extends State<TestPage> {
     }
     testDirectory =
         await Directory('${appDir.path}/${_args.Id}').create(recursive: true);
+    /*
     var bytes = await File(_args.localpath!).readAsBytes();
     ByteData data = bytes.buffer.asByteData();
     List<int> content = List<int>.generate(data.lengthInBytes, (index) => 0);
@@ -416,8 +530,119 @@ class _TestPageState extends State<TestPage> {
       content[i] = data.getUint8(i);
     }
     archive = ZipDecoder().decodeBytes(content);
+     */
+
+    final inputStream = InputFileStream(_args.localpath!);
+    archive = ZipDecoder().decodeBuffer(inputStream);
+
+
     await _uncompress(archive, testDirectory!);
 
+    // СПИСОК ВОПРОСОВ
+    list_ = [];
+
+    // ЭКЗАМЕН
+    if(_args.IdType == "t"){
+      if(await hasNetwork(context)){
+        var res = await httpAPI("close/students/mobileApp.asp",
+            '{"command": "getTestTS", "id": "${_args.Id}"}', context);
+        var json = res as Map<String, dynamic>;
+        if(json["accessid"] == 0){
+          Navigator.of(context).pop();
+          Navigator.pushNamed(context, '/alert', arguments: [_argsItem, null]);
+          return;
+        }
+        if(json["begginedAt"] == null){
+          _argsItem.time = 0;
+        }else{
+          _argsItem.time = json["begginedAt"];
+        }
+        await updateItem(_argsItem);
+
+        if(json["sections"] != null) {
+          var listts = [];
+          for (var sec in json["sections"]) {
+            listts = [...listts, ...sec["questions"]];
+          }
+          for (TSection sec in _args.sections!) {
+            for (TQuestion q in sec.questions!) {
+              var pos = listts.indexWhere((element) => element["idU"] == q.Id);
+              if(pos != -1) {
+                q.IsMarked = listts[pos]["isMarked"];
+                q.Active = true;
+                for (TAnswer ans in q.answers!) {
+                  var pos1 = listts[pos]["answers"].indexWhere((
+                      element) => element["idU"] == ans.Id);
+                  ans.answer = listts[pos]["answers"][pos1]["answer"];
+                }
+                list_.add(q);
+              }else{
+                q.IsMarked = null;
+                q.Active = null;
+              }
+            }
+          }
+          _argsItem.jsondata = jsonEncode(_args.toMap());
+          await updateItem(_argsItem);
+        }
+      }else{
+        showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text(
+                    'Экзамен'),
+                content: const Text('Можно проходить только в режиме онлайн !'),
+                actions: [
+                  ElevatedButton(
+                      onPressed: () async {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).pop();
+                        setState(() {});
+                      },
+                      child: const Text('Отмена')),
+                ],
+              );
+            });
+      }
+    }
+
+    // ПРОВЕРЯЕМ УЖЕ НАЧАТЫЙ
+    //for (var e in list_) {
+    //  if(e.Active ?? false) {
+    //    list_.add(e);
+    //  }
+    //}
+    if(list_.isEmpty) {
+      for (TSection sec in _args.sections!) {
+        if((sec.DoShuffle ?? false) == true) {
+          sec.questions!.shuffle();
+        }
+        if ((sec.PresentQuestions ?? 0) > 0) {
+          if (sec.qnum ?? false) {
+            list_ = [...list_, ...sec.questions!.take(sec.PresentQuestions!)];
+          }
+          if (sec.qbal ?? false) {
+            list_ = [...list_, ...sec.questions!.take(sec.PresentQuestions!)];
+          }
+          if (!(sec.qnum ?? false) && !(sec.qbal ?? false)) {
+            list_ = [
+              ...list_,
+              ...sec.questions!.take(
+                  (sec.CountQuestions! / 100 * sec.PresentQuestions!).round())
+            ];
+          }
+        } else {
+          list_ = [...list_, ...sec.questions!];
+        }
+      }
+      for (TQuestion e in list_) {
+        e.Active = true;
+        if(e.DoShuffle ?? false){
+          e.answers!.shuffle();
+        }
+      }
+    }
     setState(() {
       _stackToView = 1;
     });
@@ -443,4 +668,68 @@ class _TestPageState extends State<TestPage> {
     final checkPath = testDirectory?.existsSync();
     if (checkPath ?? false) testDirectory?.deleteSync(recursive: true);
   }
+
+  Future syncTest(Item item) async {
+    var isOnline = await hasNetwork(context);
+    if (!isOnline) {
+      return;
+    }
+    _argsItem.sync = true;
+    setState(() {});
+    _argsItem.jsondata = jsonEncode(_args.toMap());
+    await updateItem(_argsItem);
+
+    Course c= await getCourse(_argsItem.courseid!);
+    var res = await httpAPI(
+        "close/students/sync.asp",
+        '{"id": "${item.guid}", "course": "${c.guid}", "type": "TEST", "data": ' +
+            jsonEncode(_args.toMap()) +
+            '}',
+        context) as Map<String, dynamic>;
+
+    _args.access = [];
+    _argsItem.access = null;
+    if(res["access"] != null){
+      _args.access = TTest.toAccess(res["access"]);
+      _argsItem.access = jsonEncode(res["access"]);
+    }
+    _argsItem.jsondata = jsonEncode(_args.toMap());
+
+    _argsItem.description = res["description"];
+
+    _argsItem.history = null;
+    if(res["history"] != null){
+      _argsItem.history = jsonEncode(res["history"]);
+    }
+    _argsItem.sync = false;
+    await updateItem(_argsItem);
+    setState(() {});
+    Navigator.of(context).pop();
+  }
+
+  Future putTest(Item item) async {
+    var isOnline = await hasNetwork(context);
+    if (!isOnline) {
+      return;
+    }
+    _argsItem.jsondata = jsonEncode(_args.toMap());
+    await updateItem(_argsItem);
+    //await updateItem(item);
+    //var json = jsonDecode(item.jsondata!);
+
+    var res = await httpAPI(
+        "close/students/sync.asp",
+        '{"id": "${_argsItem.guid}", "type": "TESTTS", "data": ' +
+            jsonEncode(_args.toMap()) +
+            '}',
+        context) as Map<String, dynamic>;
+
+    setState(() {
+      _currQuestion = getQuestion(_currQuestion);
+      (_currQuestion == null)
+          ? _stackToView = 2
+          : _stackToView = 3;
+    });
+  }
+
 }

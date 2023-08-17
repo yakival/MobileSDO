@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:archive/archive_io.dart';
 import 'package:disk_space/disk_space.dart';
 import 'package:flutter/material.dart';
 import 'package:http_server/http_server.dart';
@@ -133,6 +134,8 @@ class _HtmlViewPageState extends State<HtmlViewPage> with Lifecycle {
     bool exist = File(_args.localpath!).existsSync();
     if (exist) {
       Archive archive;
+
+      /*
       var bytes = await File(_args.localpath!).readAsBytes();
       ByteData data = bytes.buffer.asByteData();
       List<int> content = List<int>.generate(data.lengthInBytes, (index) => 0);
@@ -140,6 +143,11 @@ class _HtmlViewPageState extends State<HtmlViewPage> with Lifecycle {
         content[i] = data.getUint8(i);
       }
       archive = ZipDecoder().decodeBytes(content);
+       */
+
+      final inputStream = InputFileStream(_args.localpath!);
+      archive = ZipDecoder().decodeBuffer(inputStream);
+
       _unzipped = true;
       var _size = 0;
       for (ArchiveFile file in archive) {

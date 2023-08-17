@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
+import 'package:archive/archive_io.dart';
 import 'package:disk_space/disk_space.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -165,6 +166,8 @@ class _WebViewPageState extends State<WebViewPage> with Lifecycle {
 
     Directory archiveDir = Directory('${parentDir.path}/archive');
     await archiveDir.create();
+
+    /*
     var bytes = await File(_args.localpath!).readAsBytes();
     data = bytes.buffer.asByteData();
     content = List<int>.generate(data.lengthInBytes, (index) => 0);
@@ -172,6 +175,11 @@ class _WebViewPageState extends State<WebViewPage> with Lifecycle {
       content[i] = data.getUint8(i);
     }
     archive = ZipDecoder().decodeBytes(content);
+     */
+
+    final inputStream = InputFileStream(_args.localpath!);
+    archive = ZipDecoder().decodeBuffer(inputStream);
+
     var _size = 0;
     for (ArchiveFile file in archive) {
       if (file.isFile) {
